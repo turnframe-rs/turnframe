@@ -1,4 +1,5 @@
-//! «I want to set name» names the name and gives none: the act asks, never writes.
+//! «I want to set name» names the name and gives none: the act asks, never writes. It is
+//! verified first, and asked for its value because the verdict found it asked for.
 mod support;
 
 use serde_json::json;
@@ -13,6 +14,10 @@ async fn a_field_named_without_a_value_asks_for_it() {
         .answer(
             "u1/extract",
             json!({"arguments": {"value": {"kind": "not_given"}}}),
+        )
+        .answer(
+            "u1/verify",
+            json!({"reason": "Asks to set the name.", "arguments": {}, "overall": "confirmed"}),
         );
     let run = understand(script, &turn("I want to set name")).await;
 
@@ -40,8 +45,8 @@ async fn a_field_named_without_a_value_asks_for_it() {
         }
     );
     assert!(
-        !run.was_called("u1/verify"),
-        "an act that asks is not verified: {:?}",
+        run.was_called("u1/verify"),
+        "an act that asks is verified: {:?}",
         run.called()
     );
     assert!(

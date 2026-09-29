@@ -431,6 +431,17 @@ pub enum Expectation {
     },
 }
 
+impl Expectation {
+    /// The record the assistant asked about, when it named one.
+    #[must_use]
+    pub const fn record(&self) -> Option<&TargetToken> {
+        match self {
+            Self::Values(pending) => pending.record.as_ref(),
+            Self::Obligation { record, .. } => Some(record),
+        }
+    }
+}
+
 /// An act of an earlier turn with the values it was given: one waiting for more, or one done.
 #[derive(Debug, Clone)]
 pub struct PendingAct {

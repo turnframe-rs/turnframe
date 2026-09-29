@@ -172,11 +172,23 @@ pub(crate) fn expectation(input: &UnderstandingInput) -> Option<String> {
                 .and_then(|token| input.record(token))
                 .map(|(_, record)| format!(" of {}", record.label))
                 .unwrap_or_default();
-            Some(format!(
+            let mut asked = format!(
                 "The assistant asked for: {}{record}, to {}.",
                 labels.join(", "),
                 spec.summary.trim_end_matches('.').to_lowercase()
-            ))
+            );
+            // A record given by a name nothing holds yet: what creates it is what is asked.
+            for name in &pending.missing {
+                let given = pending.given.get(name).map(|argument| &argument.value);
+                if let Some(ArgumentValue::Record(RecordValue::Named { workflow, named })) = given {
+                    let label = argument_label(spec, name, input);
+                    let _ = write!(
+                        asked,
+                        " The {label} given, «{named}», is not a {workflow} record yet."
+                    );
+                }
+            }
+            Some(asked)
         }
         Expectation::Obligation { record, sentence } => {
             let label = input

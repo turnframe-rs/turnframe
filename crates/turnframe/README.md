@@ -1,6 +1,30 @@
-# turnframe
+<h1 align="center">
+  <a href="https://turnframe.rs">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/turnframe-rs/turnframe/main/website/public/brand/turnframe-wordmark-on-dark.svg">
+      <img alt="Turnframe" src="https://raw.githubusercontent.com/turnframe-rs/turnframe/main/website/public/brand/turnframe-wordmark-on-light.svg" width="247" height="48">
+    </picture>
+  </a>
+</h1>
 
-**Deterministic conversational workflows for Rust, built around the Flow Map architecture.**
+<p align="center"><b>Deterministic conversational workflows for Rust, built around the Flow Map architecture.</b></p>
+
+<p align="center">
+  <a href="https://crates.io/crates/turnframe"><img alt="crates.io" src="https://img.shields.io/crates/v/turnframe?style=flat-square&color=4b58ff"></a>
+  <a href="https://docs.rs/turnframe"><img alt="docs.rs" src="https://img.shields.io/docsrs/turnframe?style=flat-square"></a>
+  <a href="https://github.com/turnframe-rs/turnframe/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/turnframe-rs/turnframe/ci.yml?branch=main&style=flat-square&label=CI"></a>
+  <img alt="MSRV 1.88" src="https://img.shields.io/badge/MSRV-1.88-4b58ff?style=flat-square">
+  <img alt="License: MIT or Apache-2.0" src="https://img.shields.io/badge/license-MIT%20or%20Apache--2.0-4b58ff?style=flat-square">
+</p>
+
+<p align="center">
+  <a href="https://turnframe.rs">Website</a> ·
+  <a href="https://turnframe.rs/docs">Documentation</a> ·
+  <a href="https://turnframe.rs/docs/flow-map">The Flow Map</a> ·
+  <a href="https://docs.rs/turnframe">API reference</a> ·
+  <a href="https://turnframe.rs/docs/benchmarks">Benchmarks</a> ·
+  <a href="https://turnframe.rs/docs/changelog">Changelog</a>
+</p>
 
 This is the crate an application installs. It re-exports the whole `turnframe-*`
 family behind feature flags, so a normal application never names a sub-crate and

@@ -165,8 +165,8 @@ impl ScriptedReply {
     }
 }
 
-/// A review answering every check its schema asks: the reply asks its ask, and claims
-/// beyond its material only when `claims`.
+/// A review answering every check its schema asks: the reply asks its ask, naming its
+/// record when it must, and claims beyond its material only when `claims`.
 fn review(schema: &serde_json::Value, claims: bool) -> serde_json::Value {
     let mut document = serde_json::Map::new();
     let checks = schema["properties"]
@@ -176,7 +176,7 @@ fn review(schema: &serde_json::Value, claims: bool) -> serde_json::Value {
     for check in checks {
         let answer = match check.as_str() {
             "reasoning" => serde_json::Value::from("Judged against the material."),
-            "asks_the_ask" => serde_json::Value::from(true),
+            "asks_the_ask" | "names_the_record" => serde_json::Value::from(true),
             "claims_beyond_material" => serde_json::Value::from(claims),
             _ => serde_json::Value::from(false),
         };

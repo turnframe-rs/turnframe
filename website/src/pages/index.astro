@@ -1,6 +1,7 @@
 ---
 import SiteSection from '../components/SiteSection.astro';
 import {
+  BreakIt,
   Claim,
   CodeBlock,
   ContrastTable,
@@ -16,6 +17,7 @@ import {
 } from '../ds/turnframe.js';
 import Base from '../layouts/Base.astro';
 import { HOME } from '../data/search.js';
+import recording from '../data/refund-runs.json';
 import { KEYWORDS, LICENSE, MSRV, REPO, VERSION, corpusRun, crates } from '../lib/repo.mjs';
 
 const run = corpusRun();
@@ -177,7 +179,14 @@ cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; 
   <div data-pagefind-body>
     <Manifesto />
 
-    <SiteSection id="flow-map" number="01" eyebrow="The Flow Map"
+    <SiteSection id="break-it" number="01" eyebrow="Break it"
+      title="Nine ways to break a refund." turn="None of them moves the money."
+      lead="Pick an attack and watch the turn it meets. The model reads the wrong order or the wrong amount, the user clicks twice, the payment provider goes silent. Each run is recorded from the real runtime: the model’s readings are scripted, and wrong on purpose. Everything after them is the library.">
+      <BreakIt client:visible recording={recording} />
+      <p class="home-more"><a href="/docs/examples">Run it yourself: <code>cargo run -p refund-desk</code> <Icon name="arrow" /></a></p>
+    </SiteSection>
+
+    <SiteSection id="flow-map" number="02" eyebrow="The Flow Map"
       title="Five steps," turn="one direction."
       lead="Turnframe is built around the Flow Map: every turn runs the same five steps, and each hands the next only what it may decide. A model’s reading reaches a record only through a reducer, a policy and, for anything consequential, a card the user clicks.">
       <ol class="site-flow">
@@ -192,34 +201,34 @@ cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; 
       <p class="home-more"><a href="/docs/flow-map">The Flow Map, step by step <Icon name="arrow" /></a></p>
     </SiteSection>
 
-    <SiteSection id="architecture" number="02" eyebrow="Frame data"
+    <SiteSection id="architecture" number="03" eyebrow="Frame data"
       title="Nine small questions," turn="not one large prompt."
       lead="A message goes through a fixed chain of narrow tasks, each with a strict schema and a check in code. Dates and amounts are computed by code from what the model points at. No task needs more than a few hundred tokens, so a small, cheap model can run a real workflow.">
       <PipelineRail />
       <p class="home-more"><a href="/docs/architecture">The turn pipeline, step by step <Icon name="arrow" /></a></p>
     </SiteSection>
 
-    <SiteSection id="reliability" number="03" eyebrow="Reliability model"
+    <SiteSection id="reliability" number="04" eyebrow="Reliability model"
       title="No RNG where it matters." turn="Honest RNG where it can’t hurt."
       lead="Reliability is not one accuracy number. Side effects, claims and workflow state are correct by construction: a violation is a defect a test can find, never model variance. Understanding is probabilistic, and it is only allowed to fail safe.">
       <SpecSheet />
       <p class="home-more"><a href="/docs/reliability-model">The five properties and their release gates <Icon name="arrow" /></a></p>
     </SiteSection>
 
-    <SiteSection id="cost" number="04" eyebrow="Low spec"
+    <SiteSection id="cost" number="05" eyebrow="Low spec"
       title="Mini models." turn="Frame‑perfect effects."
       lead={`No task needs more than a few hundred tokens, so the reading runs on mini and flash models: on this release's corpus, ${run.model} passed ${run.passed} samples at ${run.level}. Accuracy is bought with checked calls on the same small model, and effects are identical at every setting. How each run was measured, and what the figures cannot show, is in the benchmarks.`}>
       <EffortSettings client:visible presets={presets} pricing={run.pricing} foot={foot} />
       <p class="home-more"><a href="/docs/benchmarks">What is measured, and what is not claimed <Icon name="arrow" /></a></p>
     </SiteSection>
 
-    <SiteSection number="05" eyebrow="Matchup"
+    <SiteSection number="06" eyebrow="Matchup"
       title="Not an agent framework." turn="The model never holds the controller."
       lead="Turnframe is for conversational applications that write to real records. The difference is where authority sits.">
       <ContrastTable />
     </SiteSection>
 
-    <SiteSection id="code" number="06" eyebrow="Controls" title="Plain Rust." turn="No macros, no DSL.">
+    <SiteSection id="code" number="07" eyebrow="Controls" title="Plain Rust." turn="No macros, no DSL.">
       <div class="tf-split">
         <ol class="tf-points">
           <li><span><b>The projector</b> turns the stored record into a view: one phase, its open obligations, at most one blocking card.</span></li>
@@ -240,7 +249,7 @@ cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; 
       <p class="home-more"><a href="/docs/quickstart">The quickstart, in full <Icon name="arrow" /></a></p>
     </SiteSection>
 
-    <SiteSection id="crates" number="07" eyebrow="Loadout"
+    <SiteSection id="crates" number="08" eyebrow="Loadout"
       title="Install the facade." turn="Pick features."
       lead="One dependency, the family behind feature flags. The core crate is pure types and the projector: it runs no async runtime and opens no connection.">
       <CrateTable crates={crates()} />

@@ -10,7 +10,7 @@ use turnframe_core::understanding::ActId;
 use turnframe_provider::request::Message;
 use turnframe_tasks::{ModelTask, StructuralError, TaskKind};
 
-use crate::input::{RecordBrief, UnderstandingInput};
+use crate::input::{Expectation, RecordBrief, UnderstandingInput};
 use crate::render;
 use crate::schema::{nullable, object, one_of, span};
 use crate::tasks::{check_one_of, check_span};
@@ -163,6 +163,11 @@ impl<'a> ModelTask for Locate<'a> {
         let mut records = String::from("Records:");
         let mut card_handle = None;
         let mut last_about = Vec::new();
+        // Only an answer is pointed at the record the question asked about.
+        let asked = (input.label == "Answer")
+            .then(|| self.turn.expectation.as_ref().and_then(Expectation::record))
+            .flatten();
+        let mut asked_handle = None;
         for (handle, candidate) in input.handles() {
             match candidate {
                 Candidate::Record(record) => {
@@ -177,6 +182,8 @@ impl<'a> ModelTask for Locate<'a> {
                     }
                     if self.turn.last_subjects.contains(&record.token) {
                         last_about.push(handle);
+                    } else if asked == Some(&record.token) {
+                        asked_handle = Some(handle);
                     }
                 }
                 Candidate::SameTurn { words: span, .. } => {
@@ -210,12 +217,7 @@ impl<'a> ModelTask for Locate<'a> {
             Some(records),
             card_handle.map(|handle| format!("The card on screen is about {handle}.")),
             render::last_assistant(self.turn),
-            (!last_about.is_empty()).then(|| {
-                format!(
-                    "The last assistant message was about {}.",
-                    last_about.join(" and ")
-                )
-            }),
+            last_about_line(&last_about, asked_handle.as_deref()),
             Some(render::message(words)),
             Some(render::unit(input.label, words, input.words)),
             input
@@ -241,6 +243,23 @@ impl<'a> ModelTask for Locate<'a> {
 
     fn agree(&self, left: &Location, right: &Location) -> bool {
         left.record == right.record
+    }
+}
+
+/// The records the last assistant message was about, and apart the one its question asked
+/// about when that is another.
+fn last_about_line(changed: &[String], asked: Option<&str>) -> Option<String> {
+    match (changed.is_empty(), asked) {
+        (true, None) => None,
+        (true, Some(asked)) => Some(format!("The last assistant message was about {asked}.")),
+        (false, None) => Some(format!(
+            "The last assistant message was about {}.",
+            changed.join(" and ")
+        )),
+        (false, Some(asked)) => Some(format!(
+            "The last assistant message was about {}. Its question was about {asked}.",
+            changed.join(" and ")
+        )),
     }
 }
 
@@ -270,5 +289,63 @@ mod tests {
             ),
             "{rendered}"
         );
+    }
+
+    fn two_records() -> (RecordBrief, RecordBrief, OperationSpec, WorkflowKey) {
+        (
+            RecordBrief::new("t_a", "A 1", "open"),
+            RecordBrief::new("t_b", "A 2", "open"),
+            OperationSpec::new("a.set_b").summary("Set B."),
+            WorkflowKey::from("a"),
+        )
+    }
+
+    /// What locate is shown for a unit labelled `label`, after a reply that changed A 1
+    /// and asked its question about `asked`.
+    fn shown(label: &'static str, asked: &str) -> String {
+        let (first, second, spec, key) = two_records();
+        let turn = UnderstandingInput::new("X", "en-GB", chrono::NaiveDate::MIN)
+            .with_last_subject("t_a".into())
+            .with_expectation(Expectation::Obligation {
+                record: asked.into(),
+                sentence: "What is B?".to_owned(),
+            });
+        let input = LocateInput {
+            label,
+            words: Span::new(0, 0),
+            spec: &spec,
+            workflow: &key,
+            candidates: vec![Candidate::Record(&first), Candidate::Record(&second)],
+            allow_new: false,
+            allow_not_listed: false,
+            note: None,
+        };
+        format!("{:?}", Locate::new(&turn).render(&input))
+    }
+
+    #[test]
+    fn an_answer_is_told_the_record_the_question_asked_about() {
+        let rendered = shown("Answer", "t_b");
+        assert!(
+            rendered
+                .contains("The last assistant message was about r1. Its question was about r2."),
+            "{rendered}"
+        );
+    }
+
+    #[test]
+    fn a_request_is_not_told_the_record_the_question_asked_about() {
+        let rendered = shown("Request", "t_b");
+        assert!(
+            rendered.contains("The last assistant message was about r1."),
+            "{rendered}"
+        );
+        assert!(!rendered.contains("Its question was about"), "{rendered}");
+    }
+
+    #[test]
+    fn a_question_about_the_record_changed_adds_nothing() {
+        let rendered = shown("Answer", "t_a");
+        assert!(!rendered.contains("Its question was about"), "{rendered}");
     }
 }

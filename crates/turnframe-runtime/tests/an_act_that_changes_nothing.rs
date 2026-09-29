@@ -91,8 +91,8 @@ async fn an_act_that_changes_nothing_is_not_a_refusal() {
     );
 }
 
-/// And it says why, in the workflow's own words: the value already there and
-/// what would move the conversation on. Only the workflow knows either.
+/// And it says why, in the workflow's own words: the value already there. Only the
+/// workflow knows it. Saying the same value again asks for no other one.
 #[tokio::test]
 async fn the_writer_is_told_why_nothing_changed() {
     let brief = narration_brief().await;
@@ -101,7 +101,7 @@ async fn the_writer_is_told_why_nothing_changed() {
         "the reason does not name the value that is already there: {brief}"
     );
     assert!(
-        brief.contains("Say which name you want instead"),
-        "and it does not say what would move the conversation on: {brief}"
+        !brief.contains("instead") && !brief.contains("Dimmi quale"),
+        "the same value said again is read as a wish for another: {brief}"
     );
 }

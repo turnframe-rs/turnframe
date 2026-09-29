@@ -14,7 +14,7 @@ use turnframe_core::operation::{DateDirection, Money, OperationSpec};
 use turnframe_core::plan::TargetPolicy;
 use turnframe_core::understanding::Understanding;
 use turnframe_tasks::testing::ScriptedTasks;
-use turnframe_tasks::{Budget, TaskEngine, TaskScope};
+use turnframe_tasks::{Budget, TaskEngine, TaskProfiles, TaskScope};
 use turnframe_understand::{
     ActChecker, NoChecks, RecordBrief, RecordedSteps, Understander, UnderstandingInput,
     WorkflowBrief,
@@ -168,14 +168,35 @@ pub async fn understand_in(
     run_in(script, input, &NoChecks, budget).await
 }
 
+/// Understands with the engine's task profiles changed, for votes and repairs.
+pub async fn understand_profiled(
+    script: ScriptedTasks,
+    input: &UnderstandingInput,
+    profiles: TaskProfiles,
+) -> Run {
+    run_profiled(script, input, &NoChecks, Budget::understanding(), profiles).await
+}
+
 async fn run_in(
     script: ScriptedTasks,
     input: &UnderstandingInput,
     checker: &dyn ActChecker,
     budget: Budget,
 ) -> Run {
+    run_profiled(script, input, checker, budget, TaskProfiles::new()).await
+}
+
+async fn run_profiled(
+    script: ScriptedTasks,
+    input: &UnderstandingInput,
+    checker: &dyn ActChecker,
+    budget: Budget,
+    profiles: TaskProfiles,
+) -> Run {
     let provider = Arc::new(script);
-    let engine = TaskEngine::builder(provider.router()).build();
+    let engine = TaskEngine::builder(provider.router())
+        .profiles(profiles)
+        .build();
     let understander = Understander::new(engine);
     let scope = TaskScope::new(budget, Locale::from("en-GB"));
     let steps = RecordedSteps::new();

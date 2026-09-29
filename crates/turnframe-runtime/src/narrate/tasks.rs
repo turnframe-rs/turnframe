@@ -91,13 +91,20 @@ pub(crate) struct AcknowledgeInput<'a> {
     pub guidance: &'a [String],
 }
 
+/// The note for an ask about a record the turn did not reach.
+const ELSEWHERE: &str = "the ask is about another record than the rest of the outcome: its question names that record by its label, so the user knows which one it asks about.";
+
 /// What each part of an outcome is for, said only for the parts an outcome holds: a
 /// small model acts on a note about a part that is not there.
 fn outcome_notes(outcome: &TurnOutcome, carries: bool) -> Vec<&'static str> {
     if outcome.only_asks() && !carries {
-        return vec![
+        let mut notes = vec![
             "ask is all the outcome holds: the reply is that one question, in your own words, about that record, with nothing before it. When it has a because, say that reason first, in a few words.",
         ];
+        if outcome.ask.as_ref().is_some_and(|ask| ask.elsewhere) {
+            notes.push(ELSEWHERE);
+        }
+        return notes;
     }
     let mut notes = Vec::new();
     if !outcome.done.is_empty() {
@@ -111,6 +118,9 @@ fn outcome_notes(outcome: &TurnOutcome, carries: bool) -> Vec<&'static str> {
     }
     if !outcome.starting.is_empty() {
         notes.push("starting lists records the turn began without writing anything yet. Say you are starting one; with no ask, ask what the workflow guidance says to ask first.");
+    }
+    if outcome.ask.as_ref().is_some_and(|ask| ask.elsewhere) {
+        notes.push(ELSEWHERE);
     }
     if outcome.ask.is_some() {
         notes.push("ask is the one thing to ask for next. End with exactly that question, in your own words, about that record. Ask for nothing else, and offer no list of options. When it has a because, say that reason first, in a few words.");
@@ -397,14 +407,20 @@ pub(crate) struct ReviewInput<'a> {
     pub material: Value,
     /// Whether the material has an ask the reply must end on.
     pub has_ask: bool,
+    /// Whether that ask is about a record the turn did not reach, which the reply names.
+    pub elsewhere: bool,
     pub on_screen: &'a [String],
     /// Whether the material holds answers or notices the reply must give.
     pub carries: bool,
 }
 
 /// The review's checks, each a yes or no question, with the one it asks.
-const CHECKS: [(&str, &str); 5] = [
+const CHECKS: [(&str, &str); 6] = [
     ("asks_the_ask", "Does the reply ask the ask, in any words?"),
+    (
+        "names_the_record",
+        "Does its question say which record it is about, by the ask's record?",
+    ),
     (
         "asks_anything_else",
         "Does it ask for anything that is neither the ask nor something an answer in the material says?",
@@ -431,6 +447,7 @@ impl ReviewInput<'_> {
             .into_iter()
             .filter(|(name, _)| match *name {
                 "asks_the_ask" | "asks_anything_else" => self.has_ask,
+                "names_the_record" => self.has_ask && self.elsewhere,
                 "contradicts_screen" => !self.on_screen.is_empty(),
                 "leaves_something_out" => self.carries,
                 _ => true,
@@ -447,6 +464,8 @@ pub(crate) struct Verdict {
     #[serde(default)]
     pub asks_the_ask: Option<bool>,
     #[serde(default)]
+    pub names_the_record: Option<bool>,
+    #[serde(default)]
     pub asks_anything_else: Option<bool>,
     #[serde(default)]
     pub claims_beyond_material: Option<bool>,
@@ -461,6 +480,10 @@ impl Verdict {
     pub fn issues(&self) -> Vec<&'static str> {
         [
             ("does_not_ask", self.asks_the_ask == Some(false)),
+            (
+                "does_not_name_the_record",
+                self.names_the_record == Some(false),
+            ),
             ("asks_something_else", self.asks_anything_else == Some(true)),
             (
                 "claims_not_in_material",
@@ -483,6 +506,7 @@ impl Verdict {
     fn answer(&self, check: &str) -> Option<bool> {
         match check {
             "asks_the_ask" => self.asks_the_ask,
+            "names_the_record" => self.names_the_record,
             "asks_anything_else" => self.asks_anything_else,
             "claims_beyond_material" => self.claims_beyond_material,
             "contradicts_screen" => self.contradicts_screen,
@@ -651,6 +675,7 @@ mod tests {
             reply: "",
             material: Value::Null,
             has_ask: true,
+            elsewhere: true,
             on_screen: &on_screen,
             carries: true,
         };
@@ -668,11 +693,75 @@ mod tests {
             reply: "Done.",
             material: Value::Null,
             has_ask: false,
+            elsewhere: false,
             on_screen: &[],
             carries: false,
         };
         let schema = Review(PhantomData).schema(&review);
         let asked: Vec<&String> = schema["properties"].as_object().unwrap().keys().collect();
         assert_eq!(asked, ["reasoning", "claims_beyond_material"]);
+    }
+
+    fn asking_elsewhere(elsewhere: bool) -> TurnOutcome {
+        TurnOutcome {
+            done: vec!["Named: A 1 is now called X.".to_owned()],
+            ask: Some(super::super::outcome::Ask {
+                record: Some("A 2".to_owned()),
+                what: "What is B?".to_owned(),
+                because: None,
+                question: "A 2: What is B?".to_owned(),
+                elsewhere,
+                expectation: None,
+            }),
+            ..TurnOutcome::default()
+        }
+    }
+
+    fn acknowledged(outcome: &TurnOutcome) -> String {
+        let input = AcknowledgeInput {
+            outcome,
+            locale: "en-GB",
+            tone: ToneProfile::Neutral,
+            message: None,
+            on_screen: &[],
+            answers: &[],
+            unanswered: &[],
+            notices: &[],
+            transcript: &[],
+            guidance: &[],
+        };
+        let task = Acknowledge {
+            max_chars: None,
+            input: PhantomData,
+        };
+        format!("{:?}", task.render(&input))
+    }
+
+    #[test]
+    fn an_ask_about_a_record_the_turn_did_not_reach_is_to_name_it() {
+        let note = "the ask is about another record than the rest of the outcome";
+        assert!(acknowledged(&asking_elsewhere(true)).contains(note));
+        assert!(!acknowledged(&asking_elsewhere(false)).contains(note));
+    }
+
+    #[test]
+    fn a_review_checks_the_ask_names_a_record_the_turn_did_not_reach() {
+        let checks = |elsewhere| {
+            let review = ReviewInput {
+                reply: "Done.",
+                material: Value::Null,
+                has_ask: true,
+                elsewhere,
+                on_screen: &[],
+                carries: false,
+            };
+            let schema = Review(PhantomData).schema(&review);
+            schema["properties"]
+                .as_object()
+                .unwrap()
+                .contains_key("names_the_record")
+        };
+        assert!(checks(true));
+        assert!(!checks(false));
     }
 }

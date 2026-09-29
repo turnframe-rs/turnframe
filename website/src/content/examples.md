@@ -1,8 +1,8 @@
 # Examples
 
-Four programs live under [`examples/`](examples/), each built on the facade. Three of them script
+Five programs live under [`examples/`](examples/), each built on the facade. Four of them script
 what each message is understood to say, run on the in-memory stores and print what the runtime
-did, so they run without an API key, a database or a network. The fourth, the console, talks to
+did, so they run without an API key, a database or a network. The fifth, the console, talks to
 a real model.
 
 ```sh
@@ -38,6 +38,24 @@ a trip whose outbound flight the airline cancelled.
 
   refused  interaction stale: bound 5, current 6
 ```
+
+## The refund desk
+
+[`examples/refund-desk`](examples/refund-desk/src/runs.rs) is the demonstration on the home page:
+a shop's refund desk under nine attacks. The model reads the wrong order or the wrong amount, or an
+order of another shop; the user takes the refund back mid-message, double-clicks, or has the app
+send the turn twice; a colleague refunds part of the order while the card is open, the payment
+provider takes the refund and never answers, or the model provider fails halfway through. Only the
+model's reading is scripted. Everything after it is the runtime, and none of the nine sends a
+refund it should not.
+
+```sh
+cargo run -p refund-desk                                                   # every run, station by station
+cargo run -p refund-desk -- --record website/src/data/refund-runs.json     # the recording the site plays
+```
+
+The example defines its own `order` workflow, so it shows the shape of a domain written outside the
+test kit. A test fails when the site's recording no longer matches what the runtime does.
 
 ## Traveler onboarding
 
@@ -92,7 +110,7 @@ explain the turn is dimmed.
 
 ## The sample domains
 
-The examples run on the sample workflows in `turnframe-test`, which the `test-kit` feature exposes
+The refund desk brings its own `order` workflow. The others run on the sample workflows in `turnframe-test`, which the `test-kit` feature exposes
 as `turnframe::testing`: a `trip` (the disruption case of one booking), a `traveler` (a passenger
 profile) and a `claim` (an expense read from a receipt). They are complete domains, with Italian
 copy beside the English, and [the recipes](/docs/recipes) explain the shapes they prove.

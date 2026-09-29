@@ -323,6 +323,14 @@ impl<'a> Chain<'_, 'a> {
         }
         let mut target = target;
         let mut status = self.missing(&extracted);
+        // An act that would ask for a value asks only when the verdict finds it asked for.
+        if matches!(status, ActStatus::NeedsValue { .. })
+            && self.verifies()
+            && let Ok(verdict) = self.verify(&target, &extracted, "verify").await
+            && verdict.overall == Overall::NotRequested
+        {
+            return self.not_understood(NotUnderstoodReason::NotRequested, Some(target));
+        }
         if status == ActStatus::Ready && self.verifies() {
             match self
                 .verified(&mut target, input.as_ref(), &mut extraction, &mut extracted)

@@ -200,7 +200,9 @@ application, and the file is easy to load into Langfuse or any other tool that r
 
 Examples live under [`examples/`](examples/): a travel-disruption desk that walks the four
 guarantees in order (dependent acts, a protected leg, a stale card, an airline that does not
-answer), a traveler onboarding flow, and a mixed question-and-action turn. Each is a runnable binary
+answer), a shop's refund desk under nine attacks (the demonstration on
+[turnframe.rs](https://turnframe.rs)), a traveler onboarding flow, and a mixed question-and-action
+turn. Each is a runnable binary
 built on the facade, the in-memory stores and a scripted provider, so `cargo run -p travel-desk`
 needs no API key and no database, and each prints what the runtime actually did.
 

@@ -1,0 +1,1380 @@
+{
+  "recorded_with": "cargo run -p refund-desk -- --record website/src/data/refund-runs.json",
+  "version": "0.1.0",
+  "orders": [
+    {
+      "label": "Order 381",
+      "customer": "Giulia Neri",
+      "paid": "€129.00",
+      "delivered": "18 September",
+      "listed": true
+    },
+    {
+      "label": "Order 318",
+      "customer": "Luca Moretti",
+      "paid": "€189.00",
+      "delivered": "10 September",
+      "listed": true
+    },
+    {
+      "label": "Order 402",
+      "customer": "another shop's customer",
+      "paid": "€129.00",
+      "delivered": "25 September",
+      "listed": false
+    }
+  ],
+  "runs": [
+    {
+      "id": "no-attack",
+      "group": "none",
+      "label": "No attack",
+      "attack": "Nothing goes wrong: the refund is asked for, confirmed and sent.",
+      "message": "Refund order 381 for €129",
+      "stopped_at": null,
+      "verdict": {
+        "kind": "one_refund",
+        "text": "One refund, recorded once"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "order.request_refund on Order 381, amount €129.00: ready.",
+          "scripted": true
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "u1.a1 is about order 381 at revision 1."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: low risk, needs no confirmation."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 2."
+        },
+        {
+          "station": "decision",
+          "kind": "card",
+          "state": "persisted",
+          "text": "Refund this order?",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "id": "card_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_requested on order 381",
+          "rev": 2,
+          "code": "order.refund_requested",
+          "id": "evt_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund requested: Confirm the card to send €129.00 to the payment provider.",
+          "code": "order.refund_requested"
+        },
+        {
+          "station": "decision",
+          "kind": "click",
+          "text": "Clicks «Refund».",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "option": "refund",
+          "id": "card_1"
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "The click is about order 381 at revision 2."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: external and regulated, needs an explicit click: the click is it."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 3."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_sent on order 381",
+          "rev": 3,
+          "code": "order.refund_sent",
+          "id": "evt_2"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund sent: €129.00 was sent to the payment provider; it is not refunded until they answer.",
+          "code": "order.refund_sent"
+        },
+        {
+          "station": "ledger",
+          "kind": "outbox",
+          "state": "persisted",
+          "text": "Outbox: Completed, sent 1 time(s).",
+          "code": "Completed",
+          "id": "ob_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "The payment provider answers: accepted, reference re_381."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.provider_outcome_recorded on order 381",
+          "rev": 4,
+          "code": "order.provider_outcome_recorded",
+          "id": "evt_3"
+        }
+      ]
+    },
+    {
+      "id": "wrong-order",
+      "group": "model",
+      "label": "Picks the wrong order",
+      "attack": "The model reads order 318, another customer's, for order 381.",
+      "message": "Refund order 381 for €129",
+      "stopped_at": "decision",
+      "verdict": {
+        "kind": "nothing_moved",
+        "text": "Nothing moved"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "order.request_refund on Order 318, amount €129.00: ready.",
+          "scripted": true
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "u1.a1 is about order 318 at revision 1."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: low risk, needs no confirmation."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 2."
+        },
+        {
+          "station": "decision",
+          "kind": "card",
+          "state": "persisted",
+          "text": "Refund this order?",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Luca Moretti, order 318. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "id": "card_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_requested on order 318",
+          "rev": 2,
+          "code": "order.refund_requested",
+          "id": "evt_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund requested: Confirm the card to send €129.00 to the payment provider.",
+          "code": "order.refund_requested"
+        },
+        {
+          "station": "decision",
+          "kind": "click",
+          "text": "Clicks «Don't refund».",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Luca Moretti, order 318. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "option": "keep",
+          "id": "card_1"
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "The click is about order 318 at revision 2."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: low risk, needs no confirmation."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 3."
+        },
+        {
+          "station": "decision",
+          "kind": "notice",
+          "state": "held",
+          "text": "You said no, so that instruction was not carried out.",
+          "code": "turnframe.notice.instruction_declined"
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_declined on order 318",
+          "rev": 3,
+          "code": "order.refund_declined",
+          "id": "evt_2"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund dropped: Nothing was sent.",
+          "code": "order.refund_declined"
+        }
+      ]
+    },
+    {
+      "id": "wrong-amount",
+      "group": "model",
+      "label": "Reads the wrong amount",
+      "attack": "The model reads €1,290 for €129.",
+      "message": "Refund order 381 for €129",
+      "stopped_at": "reducer",
+      "verdict": {
+        "kind": "nothing_moved",
+        "text": "Nothing moved"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "order.request_refund on Order 381, amount €1,290.00: ready.",
+          "scripted": true
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "u1.a1 is about order 381 at revision 1."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "held",
+          "text": "rejected"
+        },
+        {
+          "station": "decision",
+          "kind": "notice",
+          "state": "held",
+          "text": "Order 381 was paid €129.00 and €0.00 of it is refunded: at most €129.00 can be refunded.",
+          "code": "turnframe.notice.act_refused"
+        }
+      ]
+    },
+    {
+      "id": "unseen-order",
+      "group": "model",
+      "label": "Names an order this desk can't see",
+      "attack": "Order 402 belongs to another shop. The model reads it as written, and it has no id to give: only the desk's directory can find a record.",
+      "message": "Refund order 402 for €129",
+      "stopped_at": "reducer",
+      "verdict": {
+        "kind": "nothing_moved",
+        "text": "Nothing moved"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 402 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 402 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "order.request_refund on an order not in view, amount €129.00: ready.",
+          "scripted": true
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "u1.a1: this desk has no such order."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "held",
+          "text": "rejected"
+        },
+        {
+          "station": "decision",
+          "kind": "notice",
+          "state": "held",
+          "text": "I could not find the record you meant.",
+          "code": "turnframe.target.missing"
+        }
+      ]
+    },
+    {
+      "id": "take-back",
+      "group": "user",
+      "label": "Takes it back mid-message",
+      "attack": "The message asks for the refund, then takes it back and asks a question.",
+      "message": "Refund order 381 for €129. Actually don't refund it yet, just tell me whether it's eligible.",
+      "stopped_at": "reading",
+      "verdict": {
+        "kind": "nothing_moved",
+        "text": "Nothing moved"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129. Actually don't refund it yet, just tell me whether it's eligible."
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129.» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Actually don't refund it yet,» is a condition.",
+          "scripted": true
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«just tell me whether it's eligible.» is a question.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "held",
+          "text": "order.request_refund is taken back by part 2 of the same message.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "A question about Order 381: «just tell me whether it's eligible.».",
+          "scripted": true
+        },
+        {
+          "station": "ledger",
+          "kind": "reply",
+          "text": "Yes: order 381 was delivered on 18 September, and its refund window is open until 18 October.",
+          "scripted": true
+        }
+      ]
+    },
+    {
+      "id": "double-click",
+      "group": "user",
+      "label": "Double-clicks Refund",
+      "attack": "The Refund button is clicked twice.",
+      "message": "Refund order 381 for €129",
+      "stopped_at": "decision",
+      "verdict": {
+        "kind": "one_refund",
+        "text": "One refund, recorded once"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "order.request_refund on Order 381, amount €129.00: ready.",
+          "scripted": true
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "u1.a1 is about order 381 at revision 1."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: low risk, needs no confirmation."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 2."
+        },
+        {
+          "station": "decision",
+          "kind": "card",
+          "state": "persisted",
+          "text": "Refund this order?",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "id": "card_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_requested on order 381",
+          "rev": 2,
+          "code": "order.refund_requested",
+          "id": "evt_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund requested: Confirm the card to send €129.00 to the payment provider.",
+          "code": "order.refund_requested"
+        },
+        {
+          "station": "decision",
+          "kind": "click",
+          "text": "Clicks «Refund».",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "option": "refund",
+          "id": "card_1"
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "The click is about order 381 at revision 2."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: external and regulated, needs an explicit click: the click is it."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 3."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_sent on order 381",
+          "rev": 3,
+          "code": "order.refund_sent",
+          "id": "evt_2"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund sent: €129.00 was sent to the payment provider; it is not refunded until they answer.",
+          "code": "order.refund_sent"
+        },
+        {
+          "station": "decision",
+          "kind": "click",
+          "text": "Clicks «Refund».",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "option": "refund",
+          "id": "card_1"
+        },
+        {
+          "station": "decision",
+          "kind": "notice",
+          "state": "held",
+          "text": "That one is already done.",
+          "code": "turnframe.notice.already_answered"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund sent: €129.00 was sent to the payment provider; it is not refunded until they answer.",
+          "code": "order.refund_sent"
+        },
+        {
+          "station": "ledger",
+          "kind": "outbox",
+          "state": "persisted",
+          "text": "Outbox: Completed, sent 1 time(s).",
+          "code": "Completed",
+          "id": "ob_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "The payment provider answers: accepted, reference re_381."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.provider_outcome_recorded on order 381",
+          "rev": 4,
+          "code": "order.provider_outcome_recorded",
+          "id": "evt_3"
+        }
+      ]
+    },
+    {
+      "id": "sent-twice",
+      "group": "user",
+      "label": "The request arrives twice",
+      "attack": "The app resends the same turn after a dropped connection.",
+      "message": "Refund order 381 for €129",
+      "stopped_at": "decision",
+      "verdict": {
+        "kind": "one_refund",
+        "text": "One refund, recorded once"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "order.request_refund on Order 381, amount €129.00: ready.",
+          "scripted": true
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "u1.a1 is about order 381 at revision 1."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: low risk, needs no confirmation."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 2."
+        },
+        {
+          "station": "decision",
+          "kind": "card",
+          "state": "persisted",
+          "text": "Refund this order?",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "id": "card_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_requested on order 381",
+          "rev": 2,
+          "code": "order.refund_requested",
+          "id": "evt_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund requested: Confirm the card to send €129.00 to the payment provider.",
+          "code": "order.refund_requested"
+        },
+        {
+          "station": "decision",
+          "kind": "world",
+          "text": "The app did not hear back, and sends the same turn again."
+        },
+        {
+          "station": "decision",
+          "kind": "refused",
+          "state": "held",
+          "text": "Refused whole: a turn with this id is already on record."
+        },
+        {
+          "station": "decision",
+          "kind": "click",
+          "text": "Clicks «Refund».",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "option": "refund",
+          "id": "card_1"
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "The click is about order 381 at revision 2."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: external and regulated, needs an explicit click: the click is it."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 3."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_sent on order 381",
+          "rev": 3,
+          "code": "order.refund_sent",
+          "id": "evt_2"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund sent: €129.00 was sent to the payment provider; it is not refunded until they answer.",
+          "code": "order.refund_sent"
+        },
+        {
+          "station": "ledger",
+          "kind": "outbox",
+          "state": "persisted",
+          "text": "Outbox: Completed, sent 1 time(s).",
+          "code": "Completed",
+          "id": "ob_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "The payment provider answers: accepted, reference re_381."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.provider_outcome_recorded on order 381",
+          "rev": 4,
+          "code": "order.provider_outcome_recorded",
+          "id": "evt_3"
+        }
+      ]
+    },
+    {
+      "id": "stale-card",
+      "group": "world",
+      "label": "The order changes under the card",
+      "attack": "A colleague refunds €30.00 of the order while the card is open.",
+      "message": "Refund order 381 for €129",
+      "stopped_at": "decision",
+      "verdict": {
+        "kind": "waiting_on_a_click",
+        "text": "Waiting on a click"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "order.request_refund on Order 381, amount €129.00: ready.",
+          "scripted": true
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "u1.a1 is about order 381 at revision 1."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: low risk, needs no confirmation."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 2."
+        },
+        {
+          "station": "decision",
+          "kind": "card",
+          "state": "persisted",
+          "text": "Refund this order?",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "id": "card_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_requested on order 381",
+          "rev": 2,
+          "code": "order.refund_requested",
+          "id": "evt_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund requested: Confirm the card to send €129.00 to the payment provider.",
+          "code": "order.refund_requested"
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "While the card is open, a colleague refunds €30.00 of the order."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refunded_outside on order 381",
+          "rev": 3,
+          "code": "order.refunded_outside",
+          "id": "evt_2"
+        },
+        {
+          "station": "decision",
+          "kind": "click",
+          "text": "Clicks «Refund».",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "option": "refund",
+          "id": "card_1"
+        },
+        {
+          "station": "decision",
+          "kind": "refused",
+          "state": "held",
+          "text": "Refused whole: the card was drawn at revision 2, and the order is at revision 3. The click authorizes nothing."
+        },
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "where does it stand?"
+        },
+        {
+          "station": "decision",
+          "kind": "card",
+          "state": "persisted",
+          "text": "Refund this order?",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€99.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [
+              {
+                "label": "Amount",
+                "before": "€129.00",
+                "after": "€99.00"
+              }
+            ],
+            "bound_revision": 3
+          },
+          "id": "card_2"
+        }
+      ]
+    },
+    {
+      "id": "timeout",
+      "group": "world",
+      "label": "The payment provider goes silent",
+      "attack": "The payment provider takes the refund and never answers.",
+      "message": "Refund order 381 for €129",
+      "stopped_at": "ledger",
+      "verdict": {
+        "kind": "one_refund",
+        "text": "One refund, recorded once"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "proposal",
+          "kind": "act",
+          "state": "proposed",
+          "text": "order.request_refund on Order 381, amount €129.00: ready.",
+          "scripted": true
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "u1.a1 is about order 381 at revision 1."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: low risk, needs no confirmation."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 2."
+        },
+        {
+          "station": "decision",
+          "kind": "card",
+          "state": "persisted",
+          "text": "Refund this order?",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "id": "card_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_requested on order 381",
+          "rev": 2,
+          "code": "order.refund_requested",
+          "id": "evt_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund requested: Confirm the card to send €129.00 to the payment provider.",
+          "code": "order.refund_requested"
+        },
+        {
+          "station": "decision",
+          "kind": "click",
+          "text": "Clicks «Refund».",
+          "card": {
+            "title": "Refund this order?",
+            "body": "€129.00 to Giulia Neri, order 381. Once sent, the payment provider decides.",
+            "options": [
+              {
+                "id": "refund",
+                "label": "Refund",
+                "primary": true
+              },
+              {
+                "id": "keep",
+                "label": "Don't refund",
+                "primary": false
+              }
+            ],
+            "entries": [],
+            "bound_revision": 2
+          },
+          "option": "refund",
+          "id": "card_1"
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "The click is about order 381 at revision 2."
+        },
+        {
+          "station": "reducer",
+          "kind": "result",
+          "state": "decided",
+          "text": "ready to execute"
+        },
+        {
+          "station": "reducer",
+          "kind": "policy",
+          "state": "decided",
+          "text": "Policy: external and regulated, needs an explicit click: the click is it."
+        },
+        {
+          "station": "decision",
+          "kind": "result",
+          "state": "committed",
+          "text": "Committed at revision 3."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.refund_sent on order 381",
+          "rev": 3,
+          "code": "order.refund_sent",
+          "id": "evt_2"
+        },
+        {
+          "station": "ledger",
+          "kind": "receipt",
+          "text": "Refund sent: €129.00 was sent to the payment provider; it is not refunded until they answer.",
+          "code": "order.refund_sent"
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "The payment provider takes the refund, and never answers."
+        },
+        {
+          "station": "ledger",
+          "kind": "outbox",
+          "state": "persisted",
+          "text": "Outbox: OutcomeUnknown, sent 1 time(s).",
+          "code": "OutcomeUnknown",
+          "id": "ob_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "The outbox runs again."
+        },
+        {
+          "station": "ledger",
+          "kind": "outbox",
+          "state": "persisted",
+          "text": "Outbox: OutcomeUnknown, sent 1 time(s).",
+          "code": "OutcomeUnknown",
+          "id": "ob_1"
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "Asked later, the provider says it has the refund: Completed."
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "Its answer arrives, twice."
+        },
+        {
+          "station": "ledger",
+          "kind": "event",
+          "state": "committed",
+          "text": "order.provider_outcome_recorded on order 381",
+          "rev": 4,
+          "code": "order.provider_outcome_recorded",
+          "id": "evt_3"
+        },
+        {
+          "station": "ledger",
+          "kind": "world",
+          "text": "The second delivery is the same batch under the same key: a replay, recorded once."
+        }
+      ]
+    },
+    {
+      "id": "model-down",
+      "group": "world",
+      "label": "The model provider fails",
+      "attack": "The model provider stops answering halfway through the reading.",
+      "message": "Refund order 381 for €129",
+      "stopped_at": "reading",
+      "verdict": {
+        "kind": "nothing_moved",
+        "text": "Nothing moved"
+      },
+      "frames": [
+        {
+          "station": "reading",
+          "kind": "message",
+          "text": "Refund order 381 for €129"
+        },
+        {
+          "station": "reading",
+          "kind": "world",
+          "text": "The model answers the first questions, then stops answering: every call times out."
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "text": "«Refund order 381 for €129» is a request.",
+          "scripted": true
+        },
+        {
+          "station": "reading",
+          "kind": "unit",
+          "state": "held",
+          "text": "«Refund order 381 for €129» was not understood: the model's extract call failed (provider_timeout)."
+        },
+        {
+          "station": "decision",
+          "kind": "notice",
+          "state": "held",
+          "text": "I did not understand this part: «Refund order 381 for €129».",
+          "code": "turnframe.notice.not_understood"
+        }
+      ]
+    }
+  ]
+}

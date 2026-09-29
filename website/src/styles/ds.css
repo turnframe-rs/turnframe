@@ -2886,3 +2886,211 @@ body {
 [data-theme="light"] .tf-player__phases li[data-s="on"]::before {
   color: var(--blue-ink);
 }
+
+/* The hostile refund: attacks on the left, the five stations of the turn on the right. */
+.tf-break {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: var(--space-5, 24px);
+  align-items: start;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+.tf-break__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 16px);
+  position: sticky;
+  top: 88px;
+}
+.tf-break__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tf-break__gtitle {
+  font: 500 11px/1.6 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.tf-break__opt {
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink-muted);
+  cursor: pointer;
+  text-align: left;
+  font: 500 13.5px/20px var(--font-sans);
+  transition:
+    color 0.14s ease,
+    background-color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+.tf-break__opt:hover {
+  color: var(--ink);
+}
+.tf-break__opt[aria-checked="true"] {
+  color: var(--ink);
+  background: var(--bg);
+  box-shadow: inset 3px 0 0 var(--lime);
+}
+.tf-break__stage {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sheet);
+  overflow: hidden;
+}
+.tf-break__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px var(--space-4, 16px);
+  border-bottom: 1px solid var(--line-strong);
+}
+.tf-break__head .tf-rec {
+  flex: none;
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+.tf-break__head .tf-rec::before {
+  content: "● ";
+  opacity: 0.35;
+}
+.tf-break__head .tf-rec[data-live="true"]::before {
+  opacity: 1;
+}
+.tf-break__attack {
+  font: 500 14px/20px var(--font-sans);
+}
+.tf-break__message {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px var(--space-4, 16px);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.tf-break__message span {
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.tf-break__message q {
+  quotes: "«" "»";
+  font: 500 15px/22px var(--font-sans);
+}
+.tf-break__station {
+  padding: 10px var(--space-4, 16px) 12px;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  transition:
+    border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+.tf-break__station[data-state="off"] {
+  opacity: 0.55;
+}
+.tf-break__station[data-state="on"] {
+  border-left-color: var(--lime);
+}
+.tf-break__station[data-state="stopped"] {
+  border-left-color: var(--amber);
+}
+.tf-break__shead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.tf-break__snum {
+  font: 500 11px/1 var(--font-mono);
+  color: var(--blue-ink);
+}
+.tf-break__shead b {
+  font: 600 14px/20px var(--font-sans);
+}
+.tf-break__swhat {
+  font: 400 12.5px/20px var(--font-sans);
+  color: var(--ink-faint);
+}
+.tf-break__stamp {
+  margin-left: auto;
+}
+.tf-break__frames {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tf-break__frames .tf-card {
+  max-width: 460px;
+  margin: 4px 0;
+}
+.tf-break__tag {
+  white-space: nowrap;
+  margin-left: 8px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  font: 500 10px/16px var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+.tf-break__empty {
+  font: 400 12px/20px var(--font-mono);
+  color: var(--ink-faint);
+}
+.tf-break__verdict {
+  padding: 14px var(--space-4, 16px);
+  font: 600 16px/22px var(--font-sans);
+  background: var(--bg);
+}
+.tf-break__verdict[data-kind="nothing_moved"] {
+  box-shadow: inset 4px 0 0 var(--lime);
+}
+.tf-break__verdict[data-kind="waiting_on_a_click"] {
+  box-shadow: inset 4px 0 0 var(--amber);
+}
+.tf-break__verdict[data-kind="one_refund"] {
+  box-shadow: inset 4px 0 0 var(--blue-ink);
+}
+.tf-break__verdict[data-kind="pending"] {
+  color: var(--ink-faint);
+}
+@media (max-width: 900px) {
+  .tf-break {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tf-break__controls {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 12px;
+    padding-bottom: 4px;
+  }
+  .tf-break__group {
+    flex-direction: row;
+    align-items: center;
+    flex: none;
+  }
+  .tf-break__opt {
+    white-space: nowrap;
+  }
+}
+@media (max-width: 600px) {
+  .tf-break .tf-trace {
+    grid-template-columns: 28px 14px minmax(0, 1fr);
+    row-gap: 0;
+  }
+  .tf-break .tf-trace__text {
+    grid-column: 1 / -1;
+    padding-left: 48px;
+  }
+}

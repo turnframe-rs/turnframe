@@ -310,4 +310,40 @@ mod tests {
             "{rendered}"
         );
     }
+
+    #[test]
+    fn a_record_asked_for_by_a_name_nothing_holds_yet_is_said_to_be_no_record() {
+        use turnframe_core::operation::OperationSpec;
+        use turnframe_core::understanding::{ArgumentValue, RecordValue, UnderstoodArgument};
+        let workflow = WorkflowBrief::new("a").operation(OperationSpec::new("a.set_b"));
+        let named = UnderstoodArgument {
+            value: ArgumentValue::Record(RecordValue::Named {
+                workflow: "b".into(),
+                named: "Beta".to_owned(),
+            }),
+            excerpt: None,
+        };
+        let turn = UnderstandingInput::new("create it", "en-GB", chrono::NaiveDate::MIN)
+            .with_workflow(workflow.clone())
+            .with_expectation(crate::input::Expectation::Values(
+                crate::input::PendingAct {
+                    operation: "a.set_b".into(),
+                    record: None,
+                    given: std::iter::once(("b".to_owned(), named)).collect(),
+                    missing: vec!["b".to_owned()],
+                },
+            ));
+        let input = RouteInput {
+            label: "Request",
+            words: Span::new(0, 1),
+            workflows: vec![&workflow],
+            note: None,
+            others: Vec::new(),
+        };
+        let rendered = format!("{:?}", Route::new(&turn).render(&input));
+        assert!(
+            rendered.contains("The b given, «Beta», is not a b record yet."),
+            "{rendered}"
+        );
+    }
 }

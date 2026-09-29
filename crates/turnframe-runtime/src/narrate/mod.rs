@@ -128,6 +128,7 @@ impl Narrator<'_> {
             reply: &written.text,
             material,
             has_ask: input.outcome.ask.is_some(),
+            elsewhere: input.outcome.ask.as_ref().is_some_and(|ask| ask.elsewhere),
             on_screen: input.on_screen,
             carries: !input.answers.is_empty() || !input.notices.is_empty(),
         };

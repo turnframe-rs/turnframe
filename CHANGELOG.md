@@ -5,6 +5,44 @@ All notable changes to Turnframe are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1]
+
+Published: `turnframe-understand`, `turnframe-runtime`, `turnframe-test` and the `turnframe`
+facade at 0.1.1. Every other crate stays at 0.1.0. The facade asks for the three at 0.1.1, so
+moving to `turnframe` 0.1.1 brings their fixes; its crates.io page now opens with the wordmark,
+badges and links the repository's README has.
+
+### Added
+
+- `examples/refund-desk`: a shop's refund desk under nine attacks, from a model that reads the
+  wrong order to a payment provider that never answers, each run recorded from the runtime for the
+  demonstration on turnframe.rs. It brings its own `order` workflow. The example is not published.
+
+### Changed
+
+**`turnframe-understand`**
+
+- An answer to the assistant's question is located on the record the question asked about. When
+  the last reply changed one record and asked about another, `locate` is told both apart
+  (`Expectation::record`), for a unit that answers the question.
+- An act that would ask for a value is verified first, as every mutating act is: when the verdict
+  finds nobody asked for it, the part is not understood and nothing is asked. It costs one verify
+  call per asking act.
+- A record the assistant asked for by a name nothing holds yet is said to be no record, so a
+  request to create it is routed to the operation that creates it.
+- A repaired segmentation vote no longer shows its repair as the gist of the message.
+
+**`turnframe-runtime`**
+
+- The ask about a record the turn did not reach names that record: in the question code writes
+  (`AskCopy::elsewhere`, `«{record}: {question}»`), in a note to the writer, and in a review check.
+- An act waiting for a record the user named is let go once a record of that name is in view and
+  the turn that brought it left the act undone.
+
+**`turnframe-test`**
+
+- The trip sample's no-change explanation says the name is already there, and asks for no other.
+
 ## [0.1.0]
 
 The first release.

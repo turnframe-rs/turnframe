@@ -2522,6 +2522,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "refund-desk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "turnframe",
+ "uuid",
+]
+
+[[package]]
 name = "regex"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3624,7 +3639,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "turnframe"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3861,7 +3876,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-runtime"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3955,7 +3970,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-test"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3980,7 +3995,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-understand"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "chrono",

@@ -866,7 +866,7 @@ impl WorkflowDefinition for TripWorkflow {
         }
     }
 
-    /// Why nothing changed: the name already there, and what to say next.
+    /// Why nothing changed: the name already there.
     fn nothing_changed(
         &self,
         state: Option<&TripState>,
@@ -880,12 +880,9 @@ impl WorkflowDefinition for TripWorkflow {
         }
         let name = state?.name.as_deref()?;
         Some(
-            LocalizedText::new(format!(
-                "The trip is already called \"{name}\". Say which name you want instead."
-            ))
-            .with(
+            LocalizedText::new(format!("The trip is already called \"{name}\".")).with(
                 Locale::from("it-IT"),
-                format!("Il viaggio si chiama già «{name}». Dimmi quale nome vuoi."),
+                format!("Il viaggio si chiama già «{name}»."),
             ),
         )
     }

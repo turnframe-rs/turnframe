@@ -458,13 +458,20 @@ Perform these in order once every gate above is checked.
 3. **CHANGELOG.** Update `CHANGELOG.md` with a section for the new version: added, changed,
    deprecated, removed, fixed, security. Mention migration steps for any breaking change. Changes
    made since the last release gather under `[Unreleased]` until then.
-4. **Version bump.** Set `workspace.package.version` and every intra-workspace dependency
-   version in the root `Cargo.toml`; refresh `Cargo.lock`.
-5. **Tag.** Create an annotated tag `vX.Y.Z` on the reviewed commit.
-6. **Publish in dependency order.** `cargo publish --workspace --dry-run` first, then
-   `cargo publish --workspace`: cargo orders the eighteen library crates by their dependencies and
-   waits for each to be indexed before the next, and the four examples are `publish = false`. The
-   order it takes is `turnframe-core` and `turnframe-macros`; `turnframe-provider`,
+4. **Version bump, per crate.** Bump only the crates whose code changed since their last
+   published version: a patch for fixes and additions, the minor component for a breaking change
+   before 1.0. A bumped crate carries its own `version` in its `Cargo.toml`; the others keep
+   `version.workspace`. Whenever a crate the `turnframe` facade depends on is released, the facade
+   is released with it, a patch at least: its version is the one applications see, and its
+   requirement on each released crate is raised to the new version in the root `Cargo.toml`, so
+   moving to the new facade brings the fixes. Raise another dependent's requirement only when it
+   needs the new version. Refresh `Cargo.lock`. The release is one squashed commit.
+5. **Tag.** Create an annotated tag `<crate>-vX.Y.Z` on that commit for each crate published.
+6. **Publish in dependency order.** For each bumped crate, `cargo publish -p <crate> --dry-run`,
+   then `cargo publish -p <crate>`, in the order below; crates.io rate-limits publishing, which is
+   why a release publishes only what changed. A release of every crate is
+   `cargo publish --workspace`, which orders the eighteen library crates by their dependencies and
+   waits for each to be indexed before the next; the examples are `publish = false`. The order is `turnframe-core` and `turnframe-macros`; `turnframe-provider`,
    `turnframe-store` and `turnframe-telemetry`; `turnframe-prompt`, `turnframe-tasks`,
    `turnframe-store-postgres` and the Bedrock and Ollama adapters; `turnframe-understand`; the
    OpenAI, Anthropic and Gemini adapters, whose live tests use it; `turnframe-test` and

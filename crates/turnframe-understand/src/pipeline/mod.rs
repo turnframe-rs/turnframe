@@ -488,12 +488,14 @@ impl Understander {
         {
             units::small_talk_stays(&mut units, *words);
         }
-        // After a repair round the analysis speaks of the repair, not of the message.
-        let repair = format!("{}#repair", segment.as_str());
-        let repaired = scope
-            .records()
-            .iter()
-            .any(|record| record.task_id.starts_with(&repair));
+        // After a repair round the analysis speaks of the repair, not of the message: a
+        // repaired vote is `…#vote1#repair1`.
+        let repaired = scope.records().iter().any(|record| {
+            record
+                .task_id
+                .strip_prefix(segment.as_str())
+                .is_some_and(|rest| rest.starts_with('#') && rest.contains("#repair"))
+        });
         steps.step(Step::Segmented {
             // A reading told what a check saw speaks of the check, as a repaired one does.
             analysis: if repaired || retry.is_some() {

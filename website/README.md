@@ -38,13 +38,15 @@ npm run preview   # dist/ through the Worker, as Cloudflare serves it
 | `src/lib/repo.mjs` | the facts read from the repository |
 | `src/content/` | the few pages written for the site: introduction, installation, examples, API reference |
 | `src/data/scenarios.js` | the four scripted turns of the replay on the home page |
+| `src/data/refund-runs.json` | the hostile refund's ten runs, recorded from the real runtime by `cargo run -p refund-desk -- --record`; a test in `examples/refund-desk` fails when it is out of date |
 | `src/ds/turnframe.js`, `src/styles/ds.css` | the design system's components and stylesheet |
 | `design/tokens.json` | the design system's tokens; `scripts/tokens.mjs` writes `src/styles/tokens.css` from them |
 | `scripts/cards/` | the social card and touch icon, as HTML; `node scripts/cards.mjs` renders the PNGs |
 | `worker/index.js` | the Worker in front of the assets: `www` to the apex, and security headers |
 
 Pages are static HTML. React renders the design system's components at build time and hydrates
-four of them in the browser: the replay, the effort panel, code tabs and copy buttons. Search is
+five of them in the browser: the replay, the hostile refund, the effort panel, code tabs and copy
+buttons. Search is
 [Pagefind](https://pagefind.app), indexed from the built pages. `/llms.txt` lists every page for a
 language model, and `/llms-full.txt` holds them all in one file.
 

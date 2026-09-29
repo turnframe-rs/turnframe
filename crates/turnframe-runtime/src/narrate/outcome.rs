@@ -72,6 +72,9 @@ pub(crate) struct Ask {
     pub because: Option<String>,
     /// The question the reply asks when no model writes one, and the model rewords.
     pub question: String,
+    /// Whether it is about a record the turn did not reach, so the question names it.
+    #[serde(skip)]
+    pub elsewhere: bool,
     /// What the next turn expects, recorded once the reply is out.
     #[serde(skip)]
     pub expectation: Option<Expectation>,
@@ -89,6 +92,9 @@ pub struct AskCopy {
     pub obligation: LocalizedText,
     /// A receipt the user contested; `{what}` is the receipt as it was shown.
     pub contested: LocalizedText,
+    /// A question about a record the turn did not reach; `{record}` is its label and
+    /// `{question}` the question.
+    pub elsewhere: LocalizedText,
 }
 
 impl AskCopy {
@@ -106,6 +112,7 @@ impl AskCopy {
             refused_value: LocalizedText::new("{because} What should the {what} be instead?"),
             obligation: LocalizedText::new("Still needed: {what}."),
             contested: LocalizedText::new("{what} What should it be instead?"),
+            elsewhere: LocalizedText::new("{record}: {question}"),
         }
     }
 }
@@ -116,7 +123,10 @@ impl Default for AskCopy {
     }
 }
 
-crate::copy::server_copy!(AskCopy, [value, refused_value, obligation, contested]);
+crate::copy::server_copy!(
+    AskCopy,
+    [value, refused_value, obligation, contested, elsewhere]
+);
 
 /// The built-in Italian of [`AskCopy`], by field.
 const ITALIAN: &[(&str, &str)] = &[
@@ -127,6 +137,7 @@ const ITALIAN: &[(&str, &str)] = &[
     ),
     ("obligation", "Manca ancora: {what}."),
     ("contested", "{what} Come dovrebbe essere, invece?"),
+    ("elsewhere", "{record}: {question}"),
 ];
 
 fn fill(template: &LocalizedText, locale: &Locale, pairs: &[(&str, &str)]) -> String {
@@ -175,6 +186,7 @@ impl Material<'_> {
                 what: contested.clone(),
                 because: None,
                 question: fill(&self.copy.contested, self.locale, &[("what", contested)]),
+                elsewhere: false,
                 expectation: None,
             });
         }
@@ -201,6 +213,7 @@ impl Material<'_> {
                 what,
                 because,
                 question,
+                elsewhere: false,
                 // The waiting act is recorded as its own expectation already.
                 expectation: None,
             });
@@ -246,9 +259,21 @@ impl Material<'_> {
                 obligation: what.clone(),
             },
         };
+        let record = self.label(&view.case_ref);
+        // A record the turn did not reach is not the one the reply talks about: name it.
+        let elsewhere = !reached(&view.case_ref) && record.is_some();
+        let question = match record.as_deref().filter(|_| elsewhere) {
+            Some(label) => fill(
+                &self.copy.elsewhere,
+                self.locale,
+                &[("record", label), ("question", &question)],
+            ),
+            None => question,
+        };
         Some(Ask {
-            record: self.label(&view.case_ref),
+            record,
             question,
+            elsewhere,
             expectation: Some(expectation),
             what,
             because: None,
@@ -533,6 +558,66 @@ mod tests {
         material.touched = &touched;
         material.beside = &beside;
         assert_eq!(material.outcome().ask, None);
+    }
+
+    fn owing(case_id: &str, owed: bool) -> ErasedWorkflowView {
+        ErasedWorkflowView {
+            case_ref: CaseRef::new("sample", case_id, CaseRevision(1)),
+            workflow_version: turnframe_core::ids::WorkflowVersion::from("1"),
+            phase: serde_json::json!("collecting"),
+            phase_ownership: turnframe_core::flow::PhaseOwnership::User,
+            obligations: owed
+                .then(|| turnframe_core::flow::ErasedObligation {
+                    id: turnframe_core::flow::ObligationId("\"a\"".to_owned()),
+                    value: serde_json::json!("a"),
+                    sentence: Some(LocalizedText::new("What is A?")),
+                    act: None,
+                })
+                .into_iter()
+                .collect(),
+            blocking_interaction: None,
+            notices: Vec::new(),
+            outcome: None,
+            state: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn an_obligation_of_a_record_the_turn_did_not_reach_names_that_record() {
+        let views = [owing("s-1", false), owing("s-2", true)];
+        let touched = [views[0].case_ref.key()];
+        let beside = [views[1].case_ref.key()];
+        let labels = [CaseLabel {
+            case_ref: views[1].case_ref.clone(),
+            label: "Sample 2".to_owned(),
+        }];
+        let copy = AskCopy::english();
+        let locale = Locale::from("en-GB");
+        let mut material = material(&[], &copy, &locale);
+        material.views = &views;
+        material.touched = &touched;
+        material.beside = &beside;
+        material.labels = &labels;
+        let ask = material
+            .outcome()
+            .ask
+            .expect("the other record's obligation");
+        assert!(ask.elsewhere);
+        assert_eq!(ask.question, "Sample 2: What is A?");
+    }
+
+    #[test]
+    fn an_obligation_of_a_record_the_turn_reached_is_asked_as_written() {
+        let views = [owing("s-1", true)];
+        let touched = [views[0].case_ref.key()];
+        let copy = AskCopy::english();
+        let locale = Locale::from("en-GB");
+        let mut material = material(&[], &copy, &locale);
+        material.views = &views;
+        material.touched = &touched;
+        let ask = material.outcome().ask.expect("its obligation");
+        assert!(!ask.elsewhere);
+        assert_eq!(ask.question, "What is A?");
     }
 
     #[test]

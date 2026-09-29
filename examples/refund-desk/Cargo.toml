@@ -1,0 +1,22 @@
+[package]
+name = "refund-desk"
+description = "Turnframe example: a shop's refund desk under nine attacks, recorded for the website"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+turnframe = { workspace = true, features = ["test-kit"] }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

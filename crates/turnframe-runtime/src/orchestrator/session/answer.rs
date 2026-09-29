@@ -175,7 +175,20 @@ impl Session<'_> {
             .turn
             .expectations
             .extend(composition.expectation.take());
-        let carried = still_waiting(self.previous.as_ref(), plan, &composition.turn.expectations);
+        let listed: Vec<CaseLabel> = self
+            .cases
+            .values()
+            .map(|case| CaseLabel {
+                case_ref: case.case_ref.clone(),
+                label: case.label.clone(),
+            })
+            .collect();
+        let carried = still_waiting(
+            self.previous.as_ref(),
+            plan,
+            &composition.turn.expectations,
+            &listed,
+        );
         composition.turn.expectations.extend(carried);
         self.record.tasks.extend(composition.tasks.iter().cloned());
         self.record.budget = Some(spent_together(
@@ -458,20 +471,32 @@ fn done(plan: &ReductionPlan, execution: &ExecutionReport) -> Vec<DoneAct> {
 const STILL_WAITING: usize = 3;
 
 /// Acts of earlier turns still waiting for a record the user named that did not exist:
-/// those this turn neither did nor left waiting again, carried to the next reply.
+/// those this turn neither did nor left waiting again, carried to the next reply. One
+/// whose record is now `listed` under that name was left undone by the turn that brought
+/// the record, and is let go.
 fn still_waiting(
     previous: Option<&AssistantTurn>,
     plan: &ReductionPlan,
     now: &[Expectation],
+    listed: &[CaseLabel],
 ) -> Vec<Expectation> {
     use turnframe_core::understanding::{ArgumentValue, RecordValue, UnderstoodAct};
+    let words = |text: &str| {
+        text.split_whitespace()
+            .map(str::to_lowercase)
+            .collect::<Vec<_>>()
+    };
     let names_a_record = |act: &UnderstoodAct, missing: &[String]| {
-        missing.iter().any(|name| {
-            matches!(
-                act.arguments.get(name).map(|argument| &argument.value),
-                Some(ArgumentValue::Record(RecordValue::Named { .. }))
-            )
-        })
+        missing.iter().any(
+            |name| match act.arguments.get(name).map(|argument| &argument.value) {
+                Some(ArgumentValue::Record(RecordValue::Named { workflow, named })) => {
+                    !listed.iter().any(|case| {
+                        case.case_ref.workflow == *workflow && words(&case.label) == words(named)
+                    })
+                }
+                _ => false,
+            },
+        )
     };
     let same = |act: &UnderstoodAct,
                 case_ref: Option<&CaseRef>,

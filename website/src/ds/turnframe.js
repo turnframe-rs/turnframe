@@ -2198,6 +2198,210 @@ function CrateTable({ crates, className }) {
     ),
   );
 }
+// The hostile refund: nine attacks on a refund, each a recording of the real runtime
+// (examples/refund-desk). The first run is shown whole in the static page; picking an attack
+// replays its frames station by station.
+var BREAK_STATIONS = [
+    ["reading", "Reading", "The model, scripted"],
+    ["proposal", "Proposal", "What understanding hands over"],
+    ["reducer", "Reducer", "Resolution, the domain, policy"],
+    ["decision", "Decision", "Blocked, a card, or a commit"],
+    ["ledger", "Ledger", "Events, receipts, the reply"],
+  ],
+  BREAK_GROUPS = [
+    ["none", null],
+    ["model", "The model"],
+    ["user", "The user"],
+    ["world", "The world"],
+  ],
+  BREAK_TASK = {
+    message: "message",
+    unit: "read as",
+    act: "proposed",
+    result: "result",
+    policy: "policy",
+    world: "meanwhile",
+    notice: "notice",
+    refused: "refused",
+    receipt: "receipt",
+    outbox: "outbox",
+  };
+function breakHold(frame) {
+  return frame.kind === "card" || frame.kind === "click" ? 900 : frame.kind === "reply" ? 1100 : 480;
+}
+function BreakFrame({ frame, n, clicked, stale }) {
+  if (frame.kind === "card")
+    return React.createElement(InteractionCard, {
+      className: "tf-in",
+      status: stale ? "stale" : "open",
+      title: frame.card.title,
+      body: frame.card.body,
+      entries: frame.card.entries,
+      options: frame.card.options,
+      layout: "row",
+      selected: clicked == null ? void 0 : clicked,
+      id: frame.id,
+    });
+  if (frame.kind === "reply")
+    return React.createElement(
+      Message,
+      { className: "tf-in", role: "assistant", who: frame.scripted ? "Reply, in the scripted model's words" : "Reply" },
+      frame.text,
+    );
+  let task =
+      frame.kind === "event" ? `rev ${frame.rev}` : frame.kind === "click" ? "click" : BREAK_TASK[frame.kind] || frame.kind,
+    state = frame.kind === "click" ? "decided" : frame.state || (frame.kind === "world" ? "held" : "proposed"),
+    text = frame.kind === "event" ? `${frame.code} \xB7 ${frame.id}` : frame.text;
+  return React.createElement(
+    TraceLine,
+    { n, task, state, className: cx("tf-in", frame.scripted && "tf-break__scripted") },
+    text,
+    frame.scripted && React.createElement("span", { className: "tf-break__tag" }, "scripted"),
+  );
+}
+function BreakIt({ recording, className }) {
+  let runs = recording.runs,
+    reduced = useReducedMotion(),
+    [ri, setRi] = useState(0),
+    run = runs[ri],
+    n = run.frames.length,
+    [cursor, setCursor] = useState(n),
+    [playing, setPlaying] = useState(!1),
+    choose = useCallback((i, play) => {
+      setRi(i);
+      setCursor(play ? 0 : runs[i].frames.length);
+      setPlaying(!!play);
+      if (typeof history != "undefined" && history.replaceState) history.replaceState(null, "", `#break-${runs[i].id}`);
+    }, [runs]);
+  useEffect(() => {
+    let wanted = typeof location != "undefined" && location.hash.startsWith("#break-") ? location.hash.slice(7) : null,
+      at = wanted ? runs.findIndex((r) => r.id === wanted) : -1;
+    at > 0 && choose(at, !1);
+  }, []);
+  useEffect(() => {
+    if (reduced && playing) {
+      setCursor(n);
+      setPlaying(!1);
+    }
+  }, [reduced, playing, n]);
+  useEffect(() => {
+    if (!playing) return;
+    if (cursor >= n) {
+      setPlaying(!1);
+      return;
+    }
+    let t = setTimeout(() => setCursor((c) => c + 1), cursor === 0 ? 300 : breakHold(run.frames[cursor - 1]));
+    return () => clearTimeout(t);
+  }, [playing, cursor, n, run]);
+  let shown = run.frames.slice(0, cursor),
+    done = cursor >= n,
+    current = shown.length ? shown[shown.length - 1].station : null,
+    clicks = {},
+    stale = {},
+    clicked = null;
+  // A click the runtime refused whole leaves its card stale.
+  shown.forEach((f) => {
+    if (f.kind === "click" && f.card) {
+      clicks[f.id] = f.card.options.findIndex((o) => o.id === f.option);
+      clicked = f.id;
+    }
+    if (f.kind === "refused" && clicked) stale[clicked] = !0;
+    if (f.kind === "card") clicked = null;
+  });
+  let stations = BREAK_STATIONS.map(([key, name, what], si) => {
+    let mine = shown.map((f, i) => [f, i]).filter(([f]) => f.station === key),
+      stopped = done && run.stopped_at === key,
+      reached = mine.length > 0,
+      events = key === "ledger" && done && !shown.some((f) => f.kind === "event");
+    return React.createElement(
+      "section",
+      {
+        key,
+        className: "tf-break__station",
+        "data-station": key,
+        "data-state": stopped ? "stopped" : current === key && !done ? "on" : reached ? "done" : "off",
+      },
+      React.createElement(
+        "header",
+        { className: "tf-break__shead" },
+        React.createElement("span", { className: "tf-break__snum" }, String(si + 1).padStart(2, "0")),
+        React.createElement("b", null, name),
+        React.createElement("span", { className: "tf-break__swhat" }, what),
+        stopped && React.createElement(StateTag, { state: "held", className: "tf-break__stamp" }, "Stopped here"),
+      ),
+      React.createElement(
+        "div",
+        { className: "tf-break__frames" },
+        mine.map(([f, i]) =>
+          React.createElement(BreakFrame, {
+            key: i,
+            frame: f,
+            n: i + 1,
+            clicked: f.kind === "card" ? clicks[f.id] : void 0,
+            stale: f.kind === "card" && stale[f.id],
+          }),
+        ),
+        events && React.createElement("div", { className: "tf-break__empty" }, "No event. Nothing moved."),
+        done && !reached && !events && React.createElement("div", { className: "tf-break__empty" }, "Not reached."),
+      ),
+    );
+  });
+  return React.createElement(
+    "div",
+    { className: cx("tf tf-break", className) },
+    React.createElement(
+      "div",
+      { className: "tf-break__controls", role: "radiogroup", "aria-label": "Attacks" },
+      BREAK_GROUPS.map(([group, title]) =>
+        React.createElement(
+          "div",
+          { key: group, className: "tf-break__group" },
+          title && React.createElement("span", { className: "tf-break__gtitle" }, title),
+          runs.map((r, i) =>
+            r.group === group
+              ? React.createElement(
+                  "button",
+                  {
+                    key: r.id,
+                    type: "button",
+                    role: "radio",
+                    "aria-checked": i === ri,
+                    "data-break-run": r.id,
+                    className: "tf-break__opt",
+                    onClick: () => choose(i, !reduced),
+                  },
+                  r.label,
+                )
+              : null,
+          ),
+        ),
+      ),
+    ),
+    React.createElement(
+      "div",
+      { className: "tf-break__stage" },
+      React.createElement(
+        "div",
+        { className: "tf-break__head" },
+        React.createElement("span", { className: "tf-rec", "data-live": playing }, "Recorded"),
+        React.createElement("span", { className: "tf-break__attack" }, run.attack),
+      ),
+      React.createElement(
+        "div",
+        { className: "tf-break__message" },
+        React.createElement("span", null, "Message"),
+        React.createElement("q", null, run.message),
+      ),
+      React.createElement("div", { className: "tf-break__stations" }, stations),
+      React.createElement(
+        "div",
+        { className: "tf-break__verdict", "data-kind": done ? run.verdict.kind : "pending", "aria-live": "polite" },
+        done ? run.verdict.text : "Playing…",
+      ),
+    ),
+  );
+}
+
 export {
   Logo,
   Icon,
@@ -2218,6 +2422,7 @@ export {
   InteractionCard,
   Message,
   TurnPlayer,
+  BreakIt,
   PipelineRail,
   EffortSettings,
   SpecSheet,
