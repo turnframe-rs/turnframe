@@ -1,0 +1,58 @@
+[package]
+name = "turnframe-provider"
+description = "Provider-neutral model interfaces, capability routing, fallback policy and conformance suite for Turnframe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+base64 = { workspace = true }
+turnframe-core = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+jsonschema = { workspace = true }
+secrecy = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+wiremock = { workspace = true, optional = true }
+
+[features]
+default = []
+# Reusable conformance harness for provider adapters (pulls wiremock).
+conformance = ["dep:wiremock", "tokio/rt-multi-thread", "tokio/macros", "tokio/net"]
+
+[dev-dependencies]
+criterion = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+proptest = { workspace = true }
+reqwest = { workspace = true }
+
+[[test]]
+name = "conformance_selftest"
+required-features = ["conformance"]
+
+# Spec §28: the deterministic provider-side work is measured apart from
+# provider latency, and nothing is claimed until it is (docs/benchmarks.md).
+[[bench]]
+name = "structured_parsing"
+harness = false
+
+[[bench]]
+name = "stream_reconstruction"
+harness = false
+
+[lints]
+workspace = true

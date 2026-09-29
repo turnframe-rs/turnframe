@@ -1,0 +1,47 @@
+[package]
+name = "turnframe-prompt"
+description = "Prompt sources for Turnframe: prompts compiled in from the adopter's repository, a bounded cache, and an optional Langfuse v4 registry adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+turnframe-core = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+# Only the `langfuse` feature reaches a network.
+turnframe-provider = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[features]
+default = []
+# A prompt source backed by a Langfuse project, over the Langfuse v4 public API.
+# Adds an HTTP client and a runtime dependency on a remote service; the
+# compiled-in file source stays the recommended default.
+langfuse = ["dep:turnframe-provider", "dep:reqwest", "dep:serde_json"]
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+wiremock = { workspace = true }
+
+[[test]]
+name = "langfuse_source"
+required-features = ["langfuse"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true

@@ -5,7 +5,10 @@ members = [
     "crates/turnframe-macros",
     "crates/turnframe-store",
     "crates/turnframe-store-postgres",
+    "crates/turnframe-prompt",
+    "crates/turnframe-provider",
     "crates/turnframe-telemetry",
+    "crates/turnframe-tasks",
 ]
 
 [workspace.package]
