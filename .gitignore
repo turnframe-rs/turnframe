@@ -1,0 +1,15 @@
+/target
+**/*.rs.bk
+*.profraw
+*.pdb
+.env
+.env.*
+!.env.example
+!.env.dev
+.idea/
+.vscode/
+*.swp
+.DS_Store
+*.snap.new
+# Local debug traces written with TURNFRAME_TRACE.
+/traces/

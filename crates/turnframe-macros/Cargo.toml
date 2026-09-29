@@ -1,0 +1,22 @@
+[package]
+name = "turnframe-macros"
+description = "Reserved procedural-macro crate for Turnframe (no macros are shipped in 0.1 by policy)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+
+[lints]
+workspace = true

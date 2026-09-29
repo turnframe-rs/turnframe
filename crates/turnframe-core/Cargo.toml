@@ -1,0 +1,45 @@
+[package]
+name = "turnframe-core"
+description = "Pure types and the deterministic Flow Map workflow projector for Turnframe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+async-trait = { workspace = true }
+blake3 = { workspace = true }
+chrono = { workspace = true }
+indexmap = { workspace = true }
+jsonschema = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+insta = { workspace = true }
+proptest = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+# Spec §28: projection and the hashing every turn pays for are measured
+# separately, and no performance claim is made until they are (docs/benchmarks.md).
+[[bench]]
+name = "projection"
+harness = false
+
+[[bench]]
+name = "hashing"
+harness = false
+
+[lints]
+workspace = true
