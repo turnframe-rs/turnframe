@@ -461,14 +461,14 @@ Perform these in order once every gate above is checked.
 4. **Version bump.** Set `workspace.package.version` and every intra-workspace dependency
    version in the root `Cargo.toml`; refresh `Cargo.lock`.
 5. **Tag.** Create an annotated tag `vX.Y.Z` on the reviewed commit.
-6. **Publish in dependency order.** Wait for each crate to be indexed before the next:
-   `turnframe-core`, `turnframe-store`, `turnframe-provider`, `turnframe-runtime`,
-   `turnframe-test`, then the adapter crates (`turnframe-provider-openai`,
-   `turnframe-provider-anthropic`, `turnframe-provider-gemini`, `turnframe-provider-bedrock`,
-   `turnframe-provider-ollama`), then `turnframe-store-postgres`, `turnframe-telemetry`,
-   `turnframe-eval`, and finally the `turnframe` facade. Any other workspace crate (such as
-   `turnframe-macros` or `turnframe-prompt`) publishes after everything it depends on and before
-   anything that depends on it.
+6. **Publish in dependency order.** `cargo publish --workspace --dry-run` first, then
+   `cargo publish --workspace`: cargo orders the eighteen library crates by their dependencies and
+   waits for each to be indexed before the next, and the four examples are `publish = false`. The
+   order it takes is `turnframe-core` and `turnframe-macros`; `turnframe-provider`,
+   `turnframe-store` and `turnframe-telemetry`; `turnframe-prompt`, `turnframe-tasks`,
+   `turnframe-store-postgres` and the Bedrock and Ollama adapters; `turnframe-understand`; the
+   OpenAI, Anthropic and Gemini adapters, whose live tests use it; `turnframe-test` and
+   `turnframe-runtime`; `turnframe-eval`; and last the `turnframe` facade.
 7. **Release notes.** Attach the CHANGELOG section, the conformance compatibility table produced by
    `ConformanceReport::compatibility_table` in `crates/turnframe-provider/src/conformance/report.rs`
    from an actual run, and the live smoke-test summary.
