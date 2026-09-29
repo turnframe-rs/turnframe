@@ -1,0 +1,43 @@
+[package]
+name = "turnframe-provider-anthropic"
+description = "Anthropic Messages API adapter for Turnframe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+turnframe-core = { workspace = true }
+turnframe-provider = { workspace = true }
+async-trait = { workspace = true }
+bytes = { workspace = true }
+eventsource-stream = { workspace = true }
+futures = { workspace = true }
+reqwest = { workspace = true }
+secrecy = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+turnframe-provider = { workspace = true, features = ["conformance"] }
+turnframe-tasks = { workspace = true }
+turnframe-understand = { workspace = true }
+chrono = { workspace = true }
+dotenvy = { workspace = true }
+schemars = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+wiremock = { workspace = true }
+
+[lints]
+workspace = true

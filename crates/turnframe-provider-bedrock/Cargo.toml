@@ -1,0 +1,40 @@
+[package]
+name = "turnframe-provider-bedrock"
+description = "AWS Bedrock Converse adapter for Turnframe"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+turnframe-core = { workspace = true }
+turnframe-provider = { workspace = true }
+async-trait = { workspace = true }
+aws-config = { workspace = true }
+aws-credential-types = { workspace = true }
+aws-sdk-bedrockruntime = { workspace = true }
+aws-smithy-types = { workspace = true }
+futures = { workspace = true }
+secrecy = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+dotenvy = { workspace = true }
+turnframe-provider = { workspace = true, features = ["conformance"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+wiremock = { workspace = true }
+
+[lints]
+workspace = true
