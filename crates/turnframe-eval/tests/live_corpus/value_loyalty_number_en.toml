@@ -1,0 +1,27 @@
+id = "value.loyalty_number.en"
+name = "A loyalty number stated in the message"
+tags = ["value", "en"]
+
+[turn]
+text = "their loyalty number is AZ1234567"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Marta Bianchi"
+revision = 2
+
+[setup.cases.state]
+full_name = "Marta Bianchi"
+loyalty_number = "untouched"
+status = "draft"
+
+[expect]
+events = ["traveler.loyalty_number_set"]
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/loyalty_number/answered/value"
+equals = "AZ1234567"

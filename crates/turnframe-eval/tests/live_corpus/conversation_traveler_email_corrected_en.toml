@@ -1,0 +1,36 @@
+id = "conversation.traveler_email_corrected.en"
+name = "An email corrected beside the next value keeps the correction and the value"
+tags = ["conversation", "en"]
+
+[[before]]
+text = "register Nadia Rinaldi"
+
+[[before]]
+text = "nadia@rinaldi.example"
+
+[turn]
+text = "sorry, the email is n.rinaldi@rinaldi.example, and the loyalty number is AZ7654321"
+
+[setup]
+
+[expect]
+
+[[expect.case_count]]
+workflow = "traveler"
+count = 1
+
+[[expect.workflow_state]]
+workflow = "traveler"
+path = "/full_name"
+equals = "Nadia Rinaldi"
+ignore_case = true
+
+[[expect.workflow_state]]
+workflow = "traveler"
+path = "/email"
+equals = "n.rinaldi@rinaldi.example"
+
+[[expect.workflow_state]]
+workflow = "traveler"
+path = "/loyalty_number/answered/value"
+equals = "AZ7654321"

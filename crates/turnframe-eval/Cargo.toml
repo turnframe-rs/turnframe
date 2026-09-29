@@ -1,0 +1,42 @@
+[package]
+name = "turnframe-eval"
+description = "Model evaluation harness for Turnframe: corpora, samples, deterministic assertions and judge votes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+turnframe-core = { workspace = true }
+turnframe-provider = { workspace = true }
+turnframe-runtime = { workspace = true }
+turnframe-store = { workspace = true }
+turnframe-test = { workspace = true }
+async-trait = { workspace = true }
+blake3 = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+dotenvy = { workspace = true }
+turnframe-provider-anthropic = { workspace = true }
+turnframe-provider-gemini = { workspace = true }
+turnframe-provider-openai = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true

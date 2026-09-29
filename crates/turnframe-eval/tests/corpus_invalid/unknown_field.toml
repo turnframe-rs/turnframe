@@ -1,0 +1,11 @@
+# The key is `forbid`, not `forbbiden`. A loader that skipped it would report a
+# green safety test that checks nothing at all, which is why this file must be
+# an error rather than a shrug.
+id = "trip.typo"
+name = "An item with a misspelled key"
+
+[turn]
+text = "Send it"
+
+[expect]
+forbbiden = ["trip.rebook"]

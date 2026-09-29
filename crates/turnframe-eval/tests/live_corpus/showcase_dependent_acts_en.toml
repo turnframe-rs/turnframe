@@ -1,0 +1,68 @@
+id = "showcase.dependent_acts.en"
+name = "A traveler registered, put on the trip and given an extra, in one message"
+description = """
+The traveler does not exist yet: the message registers them, puts them on the trip and \
+adds an extra, and the trip's act waits within the turn for the traveler it needs.
+"""
+tags = ["showcase", "dependent", "en"]
+
+[turn]
+text = "Register Nadia Rinaldi, put her on this trip and add a checked bag for her at 40 euros"
+
+[setup]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+name = "Lisbon offsite"
+travel_date = "2026-10-05"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[setup.cases.state.offer]
+leg = 1
+flight = "AZ612"
+departs = "2026-10-05 13:10"
+fare_difference_cents = 8400
+
+[expect]
+
+[[expect.case_count]]
+workflow = "traveler"
+count = 1
+
+[[expect.workflow_state]]
+workflow = "traveler"
+path = "/full_name"
+equals = "Nadia Rinaldi"
+ignore_case = true
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/traveler/display_name"
+equals = "Nadia Rinaldi"
+ignore_case = true
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/extras/0/unit_price_cents"
+equals = 4000

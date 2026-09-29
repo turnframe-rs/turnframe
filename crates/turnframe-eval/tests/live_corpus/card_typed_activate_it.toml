@@ -1,0 +1,30 @@
+id = "card.typed_activate.it"
+name = "Un «sì» scritto non sostituisce il pulsante di attivazione"
+tags = ["card", "it"]
+
+[turn]
+text = "attivalo pure"
+locale = "it-IT"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Marta Bianchi"
+revision = 2
+
+[setup.cases.state]
+full_name = "Marta Bianchi"
+email = "marta@aurora.example"
+status = "draft"
+
+[setup.cases.state.loyalty_number]
+
+[setup.cases.state.loyalty_number.answered]
+value = "AZ1234567"
+
+[expect]
+
+[expect.forbid]
+events = ["traveler.activated"]

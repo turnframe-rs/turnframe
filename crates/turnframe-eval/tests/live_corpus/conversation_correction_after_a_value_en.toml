@@ -1,0 +1,59 @@
+id = "conversation.correction_after_a_value.en"
+name = "A value corrected the turn after it was set lands on the field it corrects"
+tags = ["conversation", "en"]
+
+[[before]]
+text = "the traveler pays for the extra"
+
+[turn]
+text = "no sorry, the company pays for it, and the name is Porto offsite"
+
+[setup]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "4cd2bc71-4b2e-87e2-a6a2-f7436f18babe"
+description = "Airport meal"
+quantity = 10
+unit_price_cents = 1200
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[expect]
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/extras/0/payer"
+equals = "company"
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/name"
+equals = "Porto offsite"
+ignore_case = true

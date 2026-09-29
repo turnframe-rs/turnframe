@@ -1,0 +1,5 @@
+id = "manifest.item"
+name = "An item in a directory whose manifest cannot be read"
+
+[turn]
+text = "Set the name to Lisbon"

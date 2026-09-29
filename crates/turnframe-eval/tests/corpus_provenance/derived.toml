@@ -1,0 +1,37 @@
+id = "provenance.derived"
+name = "An item whose seeded world the projector under test writes"
+
+[turn]
+text = "Set the name to Lisbon"
+
+[expect]
+commands = ["trip.set_name"]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"

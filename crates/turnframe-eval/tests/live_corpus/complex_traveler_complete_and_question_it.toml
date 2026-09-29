@@ -1,0 +1,41 @@
+id = "complex.traveler_complete_and_question.it"
+name = "Un viaggiatore completato a parole, con la sua card di attivazione, e una domanda"
+tags = ["complex", "it"]
+description = "The last two fields settle the traveler, which a card then activates; the words never do."
+
+[turn]
+text = "Per Nadia Rinaldi l'email è nadia@rinaldi.example e il numero fedeltà AZ7654321. Di solito quanto bagaglio a mano è incluso nel biglietto?"
+locale = "it-IT"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Nadia Rinaldi"
+revision = 2
+
+[setup.cases.state]
+full_name = "Nadia Rinaldi"
+loyalty_number = "untouched"
+status = "draft"
+
+[expect]
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/email"
+equals = "nadia@rinaldi.example"
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/loyalty_number/answered/value"
+equals = "AZ7654321"
+
+[[expect.interaction_status]]
+workflow = "traveler"
+case_id = "trav-1"
+statuses = ["active"]
+
+[expect.forbid]
+events = ["traveler.activated"]

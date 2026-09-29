@@ -1,0 +1,35 @@
+id = "conversation.request_and_value_apart.en"
+name = "A request and its value said apart in one message start one record"
+tags = ["conversation", "en"]
+
+[[before]]
+text = "what can you do?"
+
+[turn]
+text = "open a new trip then, the traveler is Luca Ferri"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Luca Ferri"
+revision = 3
+
+[setup.cases.state]
+full_name = "Luca Ferri"
+email = "luca@ferri.example"
+loyalty_number = { answered = { value = "AZ2345678" } }
+status = "active"
+
+[expect]
+
+[[expect.case_count]]
+workflow = "trip"
+count = 1
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/traveler/display_name"
+equals = "Luca Ferri"
+ignore_case = true

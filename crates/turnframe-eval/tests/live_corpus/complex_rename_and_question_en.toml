@@ -1,0 +1,73 @@
+id = "complex.rename_and_question.en"
+name = "A traveler renamed beside a question about a trip"
+tags = ["complex", "en"]
+
+[turn]
+text = "Change Marta Bianchi's name to Marta Bianchi Ferri, and while you are at it, what is still missing on the trip?"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Marta Bianchi"
+revision = 4
+
+[setup.cases.state]
+full_name = "Marta Bianchi"
+email = "marta@aurora.example"
+status = "active"
+
+[setup.cases.state.loyalty_number]
+
+[setup.cases.state.loyalty_number.answered]
+value = "AZ1234567"
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "4cd2bc71-4b2e-87e2-a6a2-f7436f18babe"
+description = "Checked bag"
+quantity = 1
+unit_price_cents = 25000
+payer = "airline"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[expect]
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/full_name"
+equals = "Marta Bianchi Ferri"
+ignore_case = true
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/extras"
+unchanged = true

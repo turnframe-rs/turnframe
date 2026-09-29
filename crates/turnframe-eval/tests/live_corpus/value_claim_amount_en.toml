@@ -1,0 +1,45 @@
+id = "value.claim_amount.en"
+name = "Correcting a proposed amount written in euros"
+tags = ["value", "amount", "en"]
+
+[turn]
+text = "the total is 1,300 euros, not 1,250"
+
+[setup]
+
+[[setup.cases]]
+workflow = "claim"
+case_id = "claim-1"
+label = "Hotel receipt"
+revision = 3
+
+[setup.cases.state]
+attachment = "att-receipt-1"
+recorded = []
+status = "draft"
+
+[setup.cases.state.proposal]
+attachment_id = "att-receipt-1"
+
+[[setup.cases.state.proposal.fields]]
+field = "merchant"
+value = "Hotel Tejo"
+edited = false
+
+[[setup.cases.state.proposal.fields]]
+field = "total"
+value = "125000"
+edited = false
+
+[[setup.cases.state.proposal.fields]]
+field = "receipt_date"
+value = "2026-09-01"
+edited = false
+
+[expect]
+events = ["claim.proposed_field_revised"]
+
+[[expect.case_state]]
+case_id = "claim-1"
+path = "/proposal/fields/1/value"
+equals = "130000"

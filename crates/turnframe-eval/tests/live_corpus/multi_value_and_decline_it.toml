@@ -1,0 +1,34 @@
+id = "multi.value_and_decline.it"
+name = "Un valore e un rifiuto nello stesso messaggio"
+tags = ["multi", "decline", "it"]
+
+[turn]
+text = "il numero fedeltà non ce l'ha, non è iscritta al programma, e il nome completo è Nadia Rinaldi"
+locale = "it-IT"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Nuovo viaggiatore"
+revision = 2
+
+[setup.cases.state]
+email = "nadia@rinaldi.example"
+loyalty_number = "untouched"
+status = "draft"
+
+[expect]
+events = ["traveler.loyalty_number_declined", "traveler.full_name_set"]
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/loyalty_number/declined/reason"
+equals = "not_applicable"
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/full_name"
+equals = "Nadia Rinaldi"
+ignore_case = true

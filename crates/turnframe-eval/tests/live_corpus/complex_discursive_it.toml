@@ -1,0 +1,76 @@
+id = "complex.discursive.it"
+name = "Nome, data del viaggio e numero fedeltà dentro un messaggio discorsivo"
+tags = ["complex", "it"]
+description = "Filler around three values for two records. The harness clock is 2023-11-14."
+
+[turn]
+text = "Allora, ieri ho sentito la viaggiatrice e mi ha confermato tutto, quindi metti come nome offsite ottobre e la data del viaggio al 30 novembre; ah, il numero fedeltà della viaggiatrice è AZ1234567."
+locale = "it-IT"
+
+[setup]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Viaggio 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "4cd2bc71-4b2e-87e2-a6a2-f7436f18babe"
+description = "Pasto in aeroporto"
+quantity = 1
+unit_price_cents = 25000
+payer = "airline"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Marta Bianchi"
+revision = 2
+
+[setup.cases.state]
+full_name = "Marta Bianchi"
+email = "marta@aurora.example"
+loyalty_number = "untouched"
+status = "draft"
+
+[expect]
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/name"
+equals = "offsite ottobre"
+ignore_case = true
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/travel_date"
+equals = "2023-11-30"
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/loyalty_number/answered/value"
+equals = "AZ1234567"

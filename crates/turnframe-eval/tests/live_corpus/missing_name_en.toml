@@ -1,0 +1,68 @@
+id = "missing.name.en"
+name = "Asking to set the name without saying it writes nothing"
+tags = ["missing_value", "en"]
+
+[turn]
+text = "the name needs changing"
+
+[setup]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "4cd2bc71-4b2e-87e2-a6a2-f7436f18babe"
+description = "Checked bag"
+quantity = 1
+unit_price_cents = 25000
+payer = "airline"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[expect]
+events = []
+
+[expect.forbid]
+commands = ["trip.set_name"]
+
+[expect.understanding]
+
+[[expect.understanding.units]]
+kind = "request"
+words = "the name needs changing"
+operation = "trip.set_name"
+record = "trip-1"
+
+[expect.understanding.units.arguments]
+
+[expect.understanding.units.arguments.value]
+not_given = true
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/name"
+absent = true

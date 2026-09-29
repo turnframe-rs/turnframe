@@ -1,0 +1,75 @@
+id = "conversation.whole_trip.it"
+name = "Un viaggio compilato un passo alla volta ha tutto ciò che è stato detto"
+tags = ["conversation", "it"]
+
+[[before]]
+text = "apri un viaggio per Luca Ferri"
+locale = "it-IT"
+
+[[before]]
+text = "due notti d'albergo a 400 euro l'una"
+locale = "it-IT"
+
+[[before]]
+text = "le paga l'azienda"
+locale = "it-IT"
+
+[[before]]
+text = "il nome è offsite marzo"
+locale = "it-IT"
+
+[turn]
+text = "preferisco partire il 30 novembre 2026"
+locale = "it-IT"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Luca Ferri"
+revision = 3
+
+[setup.cases.state]
+full_name = "Luca Ferri"
+email = "luca@ferri.example"
+loyalty_number = { answered = { value = "AZ2345678" } }
+status = "active"
+
+[expect]
+
+[[expect.case_count]]
+workflow = "trip"
+count = 1
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/traveler/display_name"
+equals = "Luca Ferri"
+ignore_case = true
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/extras/0/quantity"
+equals = 2
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/extras/0/unit_price_cents"
+equals = 40000
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/extras/0/payer"
+equals = "company"
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/name"
+equals = "offsite marzo"
+ignore_case = true
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/travel_date"
+equals = "2026-11-30"

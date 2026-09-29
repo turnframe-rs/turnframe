@@ -1,0 +1,12 @@
+id = "start.trip.en"
+name = "Asking for a new trip opens one"
+tags = ["start", "en"]
+
+[turn]
+text = "I need to open a new trip"
+
+[setup]
+cases = []
+
+[expect]
+events = ["trip.opened"]

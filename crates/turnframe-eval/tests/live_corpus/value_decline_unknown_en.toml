@@ -1,0 +1,27 @@
+id = "value.decline_unknown.en"
+name = "Not knowing a value records that it is unknown"
+tags = ["decline", "en"]
+
+[turn]
+text = "I don't know their loyalty number"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Marta Bianchi"
+revision = 2
+
+[setup.cases.state]
+full_name = "Marta Bianchi"
+loyalty_number = "untouched"
+status = "draft"
+
+[expect]
+events = ["traveler.loyalty_number_declined"]
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/loyalty_number/declined/reason"
+equals = "unknown"

@@ -1,0 +1,83 @@
+id = "trip.set_name.it"
+name = "The same field, asked for in Italian"
+description = """
+The English item beside this one proves the pipeline; this one proves the \
+pipeline is not the English pipeline. A corpus in a single language cannot \
+tell a framework that works from a framework that works in the language it \
+was written in, and every guarantee here — each act pointing at the \
+user's own words, the receipt rendered in the locale the turn declared — is \
+one a second language can break without the first noticing. The receipt \
+assertion is the point: a turn answered correctly in the wrong language is \
+still wrong.
+"""
+tags = ["trip", "write", "locale"]
+judge = ["language_quality", "tone"]
+
+[turn]
+text = "Imposta il nome su Offsite"
+locale = "it-IT"
+
+[expect]
+commands = ["trip.set_name"]
+events = ["trip.name_set"]
+blocks = ["transition", "receipt"]
+turn_phase = "delivered"
+
+[[expect.acts]]
+kind = "apply_operation"
+operation = "trip.set_name"
+
+[[expect.target_resolution]]
+act_index = 0
+resolution = "exact"
+case_id = "trip-1"
+
+[[expect.case_revision]]
+workflow = "trip"
+case_id = "trip-1"
+revision = 4
+
+[[expect.interaction_status]]
+workflow = "trip"
+case_id = "trip-1"
+statuses = []
+
+[expect.forbid]
+commands = ["trip.rebook", "trip.withdraw"]
+events = ["trip.rebooking_sent"]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Viaggio 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "11111111-1111-4111-8111-111111111111"
+description = "Bagaglio da stiva"
+quantity = 1
+unit_price_cents = 25000
+payer = "airline"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"

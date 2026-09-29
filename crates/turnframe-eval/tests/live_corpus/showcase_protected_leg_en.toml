@@ -1,0 +1,88 @@
+id = "showcase.protected_leg.en"
+name = "The outbound is rebooked, the return kept, and nothing confirmed"
+description = """
+One message rebooks one leg, keeps the other and forbids confirming. The kept leg may be \
+read as a lock on the leg or as a condition on the turn; either way nothing changes it, \
+and the card for the outbound stays unconfirmed.
+"""
+tags = ["showcase", "constraint", "en"]
+
+[turn]
+text = "Rebook the outbound on the flight the airline offered, but don't touch the return, and don't confirm anything yet"
+
+[setup]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+name = "Lisbon offsite"
+travel_date = "2026-10-05"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "4cd2bc71-4b2e-87e2-a6a2-f7436f18babe"
+description = "Checked bag"
+quantity = 1
+unit_price_cents = 4000
+payer = "airline"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[setup.cases.state.offer]
+leg = 1
+flight = "AZ612"
+departs = "2026-10-05 13:10"
+fare_difference_cents = 8400
+
+[expect]
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/status"
+equals = "awaiting_rebooking_confirmation"
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/offer/leg"
+equals = 1
+
+[[expect.interaction_status]]
+workflow = "trip"
+case_id = "trip-1"
+statuses = ["active"]
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/legs/1/departs"
+unchanged = true
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/legs/1/flight"
+unchanged = true
+
+[expect.forbid]
+commands = ["trip.rebook"]
+events = ["trip.rebooking_sent"]

@@ -1,0 +1,60 @@
+id = "conversation.trip_for_a_new_traveler.en"
+name = "A trip for a traveler registered along the way ends with that traveler on it"
+tags = ["conversation", "en"]
+description = "The traveler named for a new trip does not exist; the user registers it, fills it in, activates it, then adds an extra."
+
+[[before]]
+text = "what can you do?"
+
+[[before]]
+text = "open a new trip for Nadia Rinaldi"
+
+[[before]]
+text = "register the new traveler"
+
+[[before]]
+text = "nadia@rinaldi.example"
+
+[[before]]
+text = "AZ7654321"
+
+[[before]]
+[before.reply]
+workflow = "traveler"
+option = "activate"
+
+[turn]
+text = "2 checked bags at 40 euro each"
+
+[setup]
+
+[expect]
+
+[[expect.case_count]]
+workflow = "trip"
+count = 1
+
+[[expect.case_count]]
+workflow = "traveler"
+count = 1
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/traveler/display_name"
+equals = "Nadia Rinaldi"
+ignore_case = true
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/extras/0/quantity"
+equals = 2
+
+[[expect.workflow_state]]
+workflow = "trip"
+path = "/extras/0/unit_price_cents"
+equals = 4000
+
+[[expect.workflow_state]]
+workflow = "traveler"
+path = "/status"
+equals = "active"

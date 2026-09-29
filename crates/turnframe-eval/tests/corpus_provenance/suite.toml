@@ -1,0 +1,5 @@
+# Every seeded state in this directory is written by the projector under test,
+# so the directory says so once instead of every file saying it again — where
+# one forgotten extra would be a silently unpaired item.
+[provenance]
+setup = "derived"

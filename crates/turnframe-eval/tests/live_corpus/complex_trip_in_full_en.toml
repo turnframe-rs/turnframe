@@ -1,0 +1,71 @@
+id = "complex.trip_in_full.en"
+name = "A trip filled in whole from one discursive message"
+tags = ["complex", "en"]
+description = "Two extras, a name and a relative travel date in one message. The harness clock is 2023-11-14."
+
+[turn]
+text = "Fill in this trip: 3 nights at the hotel at 80 euros a night and a lounge pass at 15 euros, the name is September offsite, and I would rather fly at the end of next month."
+
+[setup]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[expect]
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/name"
+equals = "September offsite"
+ignore_case = true
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/travel_date"
+equals = "2023-12-31"
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/extras/0/quantity"
+equals = 3
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/extras/0/unit_price_cents"
+equals = 8000
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/extras/1/unit_price_cents"
+equals = 1500
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/extras/2"
+absent = true

@@ -1,0 +1,28 @@
+id = "value.email.it"
+name = "La mail di un viaggiatore si registra subito, senza conferme"
+tags = ["value", "it"]
+
+[turn]
+text = "la mail è viaggi@esempio.it"
+locale = "it-IT"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Marta Bianchi"
+revision = 2
+
+[setup.cases.state]
+full_name = "Marta Bianchi"
+loyalty_number = "untouched"
+status = "draft"
+
+[expect]
+events = ["traveler.email_changed"]
+
+[[expect.case_state]]
+case_id = "trav-1"
+path = "/email"
+equals = "viaggi@esempio.it"

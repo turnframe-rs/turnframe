@@ -1,0 +1,39 @@
+id = "missing.email.it"
+name = "Chiedere di cambiare la mail senza darla non la cambia"
+tags = ["missing_value", "it"]
+
+[turn]
+text = "devo cambiare la mail del viaggiatore"
+locale = "it-IT"
+
+[setup]
+
+[[setup.cases]]
+workflow = "traveler"
+case_id = "trav-1"
+label = "Marta Bianchi"
+revision = 2
+
+[setup.cases.state]
+full_name = "Marta Bianchi"
+loyalty_number = "untouched"
+status = "draft"
+
+[expect]
+events = []
+
+[expect.forbid]
+commands = ["traveler.change_email"]
+
+[expect.understanding]
+
+[[expect.understanding.units]]
+kind = "request"
+words = "devo cambiare la mail del viaggiatore"
+operation = "traveler.change_email"
+record = "trav-1"
+
+[expect.understanding.units.arguments]
+
+[expect.understanding.units.arguments.value]
+not_given = true

@@ -1,0 +1,4 @@
+# `transcribed` is not one of the three provenances. A loader that shrugged at
+# it would silently treat testimony as an ordinary authored fixture.
+[provenance]
+setup = "transcribed"

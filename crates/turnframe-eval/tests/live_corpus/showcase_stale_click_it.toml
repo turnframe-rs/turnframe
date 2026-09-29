@@ -1,0 +1,82 @@
+id = "showcase.stale_click.it"
+name = "Un clic su una scheda che la compagnia ha riquotato nel frattempo non conferma niente"
+description = """
+The card quotes €84 more; the airline re-quotes €132 before the click. The card was shown \
+for a revision the trip has left, so the click confirms nothing and nothing is sent.
+"""
+tags = ["showcase", "card", "it"]
+
+[[before]]
+external = { workflow = "trip", case_id = "trip-1", command = { requote = { leg = 1, flight = "AZ612", departs = "2026-10-05 13:10", fare_difference_cents = 13200 } } }
+
+[turn]
+locale = "it-IT"
+[turn.reply]
+workflow = "trip"
+case_id = "trip-1"
+option = "confirm"
+
+[setup]
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 7
+
+[setup.cases.state]
+status = "awaiting_rebooking_confirmation"
+external_status = "awaiting_confirmation"
+name = "Lisbon offsite"
+travel_date = "2026-10-05"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "4cd2bc71-4b2e-87e2-a6a2-f7436f18babe"
+description = "Checked bag"
+quantity = 1
+unit_price_cents = 4000
+payer = "airline"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[setup.cases.state.offer]
+leg = 1
+flight = "AZ612"
+departs = "2026-10-05 13:10"
+fare_difference_cents = 8400
+
+[expect]
+outcome = "fails"
+commands = []
+
+[[expect.case_revision]]
+workflow = "trip"
+case_id = "trip-1"
+revision = 8
+
+[[expect.case_state]]
+case_id = "trip-1"
+path = "/offer/fare_difference_cents"
+equals = 13200
+
+[expect.forbid]
+commands = ["trip.rebook"]
+events = ["trip.rebooking_sent"]
