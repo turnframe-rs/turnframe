@@ -1,0 +1,63 @@
+[package]
+name = "turnframe"
+description = "Deterministic conversational workflows for Rust, built around the Flow Map architecture"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+turnframe-core = { workspace = true }
+turnframe-runtime = { workspace = true }
+turnframe-store = { workspace = true }
+turnframe-provider = { workspace = true }
+turnframe-tasks = { workspace = true }
+turnframe-understand = { workspace = true }
+turnframe-prompt = { workspace = true, optional = true }
+turnframe-store-postgres = { workspace = true, optional = true }
+turnframe-provider-openai = { workspace = true, optional = true }
+turnframe-provider-anthropic = { workspace = true, optional = true }
+turnframe-provider-gemini = { workspace = true, optional = true }
+turnframe-provider-bedrock = { workspace = true, optional = true }
+turnframe-provider-ollama = { workspace = true, optional = true }
+turnframe-telemetry = { workspace = true, optional = true }
+turnframe-test = { workspace = true, optional = true }
+turnframe-eval = { workspace = true, optional = true }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[features]
+default = []
+openai = ["dep:turnframe-provider-openai"]
+anthropic = ["dep:turnframe-provider-anthropic"]
+gemini = ["dep:turnframe-provider-gemini"]
+bedrock = ["dep:turnframe-provider-bedrock"]
+ollama = ["dep:turnframe-provider-ollama"]
+postgres = ["dep:turnframe-store-postgres"]
+# Prompt sources: prompts compiled in from the adopter's repository, and a cache.
+prompts = ["dep:turnframe-prompt"]
+# `prompts`, plus a source backed by a Langfuse project over the Langfuse v4 API.
+langfuse = ["prompts", "turnframe-prompt/langfuse"]
+telemetry = ["dep:turnframe-telemetry"]
+otel = ["telemetry", "turnframe-telemetry/otel"]
+test-kit = ["dep:turnframe-test"]
+eval = ["dep:turnframe-eval"]
+all-providers = ["openai", "anthropic", "gemini", "bedrock", "ollama"]
+full = ["all-providers", "postgres", "prompts", "telemetry", "test-kit", "eval"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true

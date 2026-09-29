@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/turnframe",
     "crates/turnframe-core",
     "crates/turnframe-runtime",
     "crates/turnframe-macros",
@@ -18,6 +19,10 @@ members = [
     "crates/turnframe-telemetry",
     "crates/turnframe-tasks",
     "crates/turnframe-understand",
+    "examples/travel-desk",
+    "examples/traveler-onboarding",
+    "examples/mixed-question-and-action",
+    "examples/console",
 ]
 
 [workspace.package]

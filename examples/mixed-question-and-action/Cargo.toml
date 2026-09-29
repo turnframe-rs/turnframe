@@ -1,0 +1,18 @@
+[package]
+name = "mixed-question-and-action"
+description = "Turnframe example: a single turn combining an action, a question and a no-submit constraint"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+turnframe = { workspace = true, features = ["test-kit"] }
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+uuid = { workspace = true }
+
+[lints]
+workspace = true
