@@ -1,0 +1,20 @@
+---
+source: crates/turnframe-understand/tests/every_task_prompt_stays_within_its_size_budget.rs
+expression: "format!(\"{context}\\n\\n=== schema ===\\n{schema}\")"
+---
+Records:
+- r1: Trip 1 · collecting · traveler: Bianchi
+- r2: Trip 2 · collecting · traveler: Haddad
+- none: no record
+
+Subjects: total
+
+Last assistant message: «Trip 1 for Bianchi is open. What should it say?»
+
+Message:
+S1: [1]I [2]want [3]to [4]set [5]name
+
+Question: words 4 to 5, «set name»
+
+=== schema ===
+{"type":"object","additionalProperties":false,"required":["topic","record","subjects"],"properties":{"topic":{"type":"string","enum":["record_state","accepted_values","capabilities","ability","knowledge"]},"record":{"type":"string","enum":["r1","r2","none"]},"subjects":{"type":"array","items":{"type":"string","enum":["total"]}}}}

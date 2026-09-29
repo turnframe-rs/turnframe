@@ -1,0 +1,15 @@
+---
+source: crates/turnframe-understand/tests/every_task_prompt_stays_within_its_size_budget.rs
+expression: "format!(\"{context}\\n\\n=== schema ===\\n{schema}\")"
+---
+Workflows:
+- trip: Open, fill in and rebook disruption cases.
+
+Message:
+S1: [1]I [2]want [3]to [4]set [5]name
+
+Units found:
+1. request: words 4 to 5, «set name»
+
+=== schema ===
+{"type":"object","additionalProperties":false,"required":["missed"],"properties":{"missed":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["kind","words","workflow"],"properties":{"kind":{"type":"string","enum":["request","question","constraint","correction","cancel"]},"words":{"type":"object","additionalProperties":false,"required":["from","to"],"properties":{"from":{"type":"integer","minimum":1},"to":{"type":"integer","minimum":1}}},"workflow":{"type":"string","enum":["trip","unknown"]}}}}}}

@@ -1,0 +1,3 @@
+Another reader split the user's message into the units listed. Find what they missed: a request, question, constraint, correction or cancel in words no listed unit covers.
+
+Point at each missed unit's words by the numbers shown in brackets, first to last, and give the workflow it is about, or unknown. Missing nothing is the usual answer: return an empty list then. Words a listed unit covers are never missed, whatever you would have read them as. Greetings, thanks and filler are never missed units, and neither is a word that only qualifies a listed unit's words or joins two of them («and», «then»).

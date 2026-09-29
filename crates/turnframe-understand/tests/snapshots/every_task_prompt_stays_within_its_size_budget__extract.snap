@@ -1,0 +1,31 @@
+---
+source: crates/turnframe-understand/tests/every_task_prompt_stays_within_its_size_budget.rs
+expression: "format!(\"{context}\\n\\n=== schema ===\\n{schema}\")"
+---
+Operation: trip.set_name: Name the trip.
+
+Arguments:
+- value (trip name): What the traveler calls the trip. Required. Point at the user's own words.
+
+Examples:
+- «the trip is for the Lisbon offsite» → value: «Lisbon offsite»
+- «the trip name needs changing» → value: not given
+
+Record: Trip 1 · collecting · traveler: Bianchi · name: none
+
+Today: Saturday 26 September 2026
+
+Earlier messages, oldest first:
+m1 (user):
+S1: [1]open [2]the [3]Bianchi [4]trip
+m2 (assistant):
+S1: [1]Trip [2]1 [3]for [4]Bianchi [5]is [6]open.
+S2: [7]What [8]should [9]it [10]say?
+
+Message (current):
+S1: [1]I [2]want [3]to [4]set [5]name
+
+Request: words 4 to 5, «set name»
+
+=== schema ===
+{"type":"object","additionalProperties":false,"required":["arguments"],"properties":{"arguments":{"type":"object","additionalProperties":false,"required":["value"],"properties":{"value":{"anyOf":[{"type":"object","additionalProperties":false,"required":["kind"],"properties":{"kind":{"type":"string","const":"not_given"}}},{"type":"object","additionalProperties":false,"required":["kind","text","message","from","to"],"properties":{"kind":{"type":"string","const":"words"},"text":{"type":"string","description":"The value's own words, copied exactly as the user wrote them, without the punctuation that ends their sentence."},"message":{"type":"string","enum":["current","m1","m2"]},"from":{"type":"integer","minimum":1},"to":{"type":"integer","minimum":1}}}]}}}}}

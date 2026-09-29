@@ -1,0 +1,13 @@
+---
+source: crates/turnframe-understand/tests/every_task_prompt_stays_within_its_size_budget.rs
+expression: "format!(\"{context}\\n\\n=== schema ===\\n{schema}\")"
+---
+Message:
+S1: [1]I [2]want [3]to [4]set [5]name
+
+Keep as it is: words 4 to 5, «set name»
+
+Act: u1.a1 trip.set_name on Trip 1: value «Lisbon» (words 4 to 5)
+
+=== schema ===
+{"type":"object","additionalProperties":false,"required":["reason","changes"],"properties":{"reason":{"type":"string","description":"Why, in one sentence."},"changes":{"type":"boolean"}}}

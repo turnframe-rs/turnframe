@@ -1,0 +1,22 @@
+---
+source: crates/turnframe-understand/tests/every_task_prompt_stays_within_its_size_budget.rs
+expression: "format!(\"{context}\\n\\n=== schema ===\\n{schema}\")"
+---
+Operation: trip.set_name: Name the trip.
+
+Record: Trip 1
+
+Understood:
+- value (name): «set name» (from «set name»)
+  Copied from this message: words that only refer back to a value said before («what I told you before») are not that value.
+
+Today: Saturday 26 September 2026
+
+Last assistant message: «Trip 1 for Bianchi is open. What should it say?»
+
+The user's message: «I want to set name»
+
+The part of the message this act reads, a request: «set name»
+
+=== schema ===
+{"type":"object","additionalProperties":false,"required":["reason","arguments","overall"],"properties":{"reason":{"type":"string","description":"Why, in one sentence."},"arguments":{"type":"object","additionalProperties":false,"required":["value"],"properties":{"value":{"type":"string","enum":["stated","not_stated","different","incomplete","too_much"]}}},"overall":{"type":"string","enum":["confirmed","not_requested","wrong_record"]}}}

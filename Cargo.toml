@@ -9,6 +9,7 @@ members = [
     "crates/turnframe-provider",
     "crates/turnframe-telemetry",
     "crates/turnframe-tasks",
+    "crates/turnframe-understand",
 ]
 
 [workspace.package]
