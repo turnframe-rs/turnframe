@@ -1,8 +1,9 @@
 name: Website
 
 # turnframe.rs is built from this repository: its guides, decision records, changelog, crate table
-# and measured figures are read from the checkout at build time. A change to any of those builds
-# and tests the site. Deploying is manual: run this workflow on main from the Actions tab.
+# and measured figures are read from the checkout at build time. A push to main that changes any of
+# those builds, tests and deploys the site; a pull request only builds and tests it. Running the
+# workflow by hand on main redeploys what main holds.
 on:
   push:
     branches: [main]
@@ -58,7 +59,7 @@ jobs:
       - run: npm test
 
       - name: Deploy to Cloudflare
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -66,6 +67,6 @@ jobs:
           workingDirectory: website
 
       - name: Tell search engines what changed
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         continue-on-error: true
         run: node scripts/indexnow.mjs

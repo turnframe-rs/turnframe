@@ -75,11 +75,11 @@ from the repository, never typed.
 ## Deploying
 
 `.github/workflows/website.yml` builds and tests the site on every push and pull request that
-touches it or anything it reads. It deploys only when it is run by hand on `main`, from the
-Actions tab or with `gh workflow run website.yml --ref main`. It needs two secrets,
-`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The Worker is `turnframe-website`, on the
-custom domains `turnframe.rs` and `www.turnframe.rs`; wrangler creates their DNS records and
-certificates on the first deploy, once the zone is on Cloudflare.
+touches it or anything it reads, and a push to `main` deploys it. Running it by hand on `main`, from
+the Actions tab or with `gh workflow run website.yml --ref main`, redeploys without a change. It
+needs two secrets, `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The Worker is
+`turnframe-website`, on the custom domains `turnframe.rs` and `www.turnframe.rs`; wrangler creates
+their DNS records and certificates on the first deploy, once the zone is on Cloudflare.
 
 By hand, from a machine logged in with `npx wrangler login`:
 
