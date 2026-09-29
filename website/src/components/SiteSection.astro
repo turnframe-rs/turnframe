@@ -1,0 +1,20 @@
+---
+// A numbered section: the number in Doto and its name in the margin, the title with its second
+// clause in blue ink, the lead, then the body.
+interface Props { id?: string; number?: string; eyebrow?: string; title?: string; turn?: string; lead?: string; rule?: boolean }
+const { id, number, eyebrow, title, turn, lead, rule = true } = Astro.props;
+---
+<section id={id} class:list={['tf tf-section', rule && 'tf-section--rule']}>
+  <div class="tf-section__inner">
+    {(eyebrow || title) && (
+      <div class="tf-section__head">
+        <div class="tf-eyebrow">{number && <b>{number}</b>}{eyebrow}</div>
+        <div>
+          {title && <h2 class="tf-section__title">{title}{turn && <> <em>{turn}</em></>}</h2>}
+          {lead && <p class="tf-section__lead">{lead}</p>}
+        </div>
+      </div>
+    )}
+    <div class="tf-section__body"><slot /></div>
+  </div>
+</section>

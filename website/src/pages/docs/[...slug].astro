@@ -1,0 +1,188 @@
+---
+import { Icon } from '../../ds/turnframe.js';
+import Base from '../../layouts/Base.astro';
+import { NAV, load } from '../../lib/docs.mjs';
+import { REPO } from '../../lib/repo.mjs';
+
+export async function getStaticPaths() {
+  const pages = await load();
+  return pages.map((page) => ({
+    params: { slug: page.slug || undefined },
+    props: { page, pages },
+  }));
+}
+
+const { page, pages } = Astro.props;
+const previous = pages[page.index - 1];
+const next = pages[page.index + 1];
+const labelOf = (slug) => pages.find((candidate) => candidate.slug === slug)?.label ?? slug;
+const site = Astro.site;
+const at = (path) => new URL(path, site).href;
+const updated = page.updated
+  ? new Date(`${page.updated}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  : null;
+const schema = [
+  {
+    '@type': 'TechArticle',
+    headline: page.title,
+    description: page.description,
+    url: at(page.url),
+    inLanguage: 'en-GB',
+    ...(page.updated ? { dateModified: page.updated } : {}),
+    articleSection: page.section,
+    isPartOf: { '@type': 'WebSite', name: 'Turnframe', url: at('/') },
+    about: { '@type': 'SoftwareSourceCode', name: 'Turnframe', codeRepository: REPO, programmingLanguage: 'Rust' },
+    author: { '@type': 'Organization', name: 'Turnframe contributors', url: REPO },
+  },
+  {
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Turnframe', item: at('/') },
+      { '@type': 'ListItem', position: 2, name: 'Docs', item: at('/docs') },
+      ...(page.slug ? [{ '@type': 'ListItem', position: 3, name: page.label, item: at(page.url) }] : []),
+    ],
+  },
+];
+---
+<Base
+  title={page.metaTitle}
+  heading={page.title}
+  description={page.description}
+  article={{ modified: page.updated, section: page.section }}
+  schema={schema}
+>
+  <div class="docs">
+    <div class="docs-bar">
+      <button type="button" class="tf-btn tf-btn--ghost tf-btn--sm" data-docs-menu aria-expanded="false" aria-controls="docs-nav">
+        <Icon name="menu" /> {page.section}
+      </button>
+      {page.headings.length > 0 && (
+        <details class="docs-bar__toc">
+          <summary>On this page</summary>
+          <ol>
+            {page.headings.map((heading) => (
+              <li class={`depth-${heading.depth}`}><a href={`#${heading.id}`}>{heading.text}</a></li>
+            ))}
+          </ol>
+        </details>
+      )}
+    </div>
+
+    <nav class="docs-nav" id="docs-nav" aria-label="Documentation" data-docs-nav data-open="false">
+      {NAV.map((section) => {
+        const here = section.pages.some((candidate) => candidate.slug === page.slug);
+        const links = (
+          <ul>
+            {section.pages.map((candidate) => (
+              <li>
+                <a
+                  href={candidate.slug ? `/docs/${candidate.slug}` : '/docs'}
+                  aria-current={candidate.slug === page.slug ? 'page' : undefined}
+                >
+                  {labelOf(candidate.slug)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        );
+        return section.collapsed ? (
+          <details class="docs-nav__group" open={here}>
+            <summary>{section.title}</summary>
+            {links}
+          </details>
+        ) : (
+          <div class="docs-nav__group">
+            <h2>{section.title}</h2>
+            {links}
+          </div>
+        );
+      })}
+      <div class="docs-nav__group">
+        <h2>Elsewhere</h2>
+        <ul>
+          <li><a href={REPO} rel="noopener">GitHub <Icon name="external" size={12} /></a></li>
+          <li><a href="/llms.txt">llms.txt</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <article class="docs-main" data-pagefind-body>
+      <p class="docs-crumbs">
+        <a href="/docs">Docs</a> <span aria-hidden="true">/</span> <span>{page.section}</span>
+      </p>
+      {page.adr && <p class="docs-adr" aria-hidden="true"><b>ADR</b> {page.adr}</p>}
+      <h1 class="docs-title" data-pagefind-meta="title">{page.title}</h1>
+      <div class="doc" set:html={page.html} />
+
+      <footer class="docs-foot" data-pagefind-ignore>
+        <p class="docs-source">
+          {page.source ? (
+            <>
+              This page is <a href={`${REPO}/blob/main/${page.source}`} rel="noopener"><code>{page.source}</code></a> in
+              the repository, rendered as the site was built.
+            </>
+          ) : (
+            <>Written for the site, from the repository’s own guides and code.</>
+          )}{' '}
+          <a href={page.edit} rel="noopener">Edit on GitHub <Icon name="external" size={12} /></a>
+          {updated && <><br />Last changed <time datetime={page.updated}>{updated}</time>.</>}
+        </p>
+        <nav class="docs-pager" aria-label="Previous and next">
+          {previous ? (
+            <a href={previous.url} rel="prev"><small>Previous</small>{previous.label}</a>
+          ) : <span></span>}
+          {next && <a href={next.url} rel="next" class="docs-pager__next"><small>Next</small>{next.label}</a>}
+        </nav>
+      </footer>
+    </article>
+
+    <aside class="docs-toc" aria-label="On this page">
+      {page.headings.length > 0 && (
+        <>
+          <h2>On this page</h2>
+          <ol data-toc>
+            {page.headings.map((heading) => (
+              <li class={`depth-${heading.depth}`}><a href={`#${heading.id}`} data-toc-link={heading.id}>{heading.text}</a></li>
+            ))}
+          </ol>
+        </>
+      )}
+    </aside>
+  </div>
+</Base>
+
+<script>
+  const menu = document.querySelector<HTMLButtonElement>('[data-docs-menu]');
+  const nav = document.querySelector<HTMLElement>('[data-docs-nav]');
+  const bar = document.querySelector<HTMLElement>('.docs-bar');
+  const setOpen = (open: boolean) => {
+    if (!nav || !menu) return;
+    // The drawer starts where the bar ends, which depends on whether the contents are unfolded.
+    if (open && bar) nav.style.setProperty('--drawer-top', `${bar.getBoundingClientRect().bottom}px`);
+    nav.dataset.open = String(open);
+    menu.setAttribute('aria-expanded', String(open));
+    document.documentElement.style.overflow = open ? 'hidden' : '';
+  };
+  menu?.addEventListener('click', () => setOpen(nav?.dataset.open !== 'true'));
+  addEventListener('keydown', (event) => event.key === 'Escape' && nav?.dataset.open === 'true' && setOpen(false));
+  matchMedia('(min-width: 901px)').addEventListener('change', () => setOpen(false));
+  // Bring the current page into view inside the sidebar, without scrolling the page itself.
+  const here = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+  if (nav && here && here.offsetTop > nav.clientHeight * 0.6) nav.scrollTop = here.offsetTop - nav.clientHeight / 3;
+
+  // The table of contents marks the section being read.
+  const links = new Map(
+    [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')].map((link) => [link.dataset.tocLink, link]),
+  );
+  const headings = [...links.keys()].map((id) => document.getElementById(id!)).filter(Boolean) as HTMLElement[];
+  const mark = () => {
+    const line = 120;
+    let current = headings[0];
+    for (const heading of headings) if (heading.getBoundingClientRect().top <= line) current = heading;
+    links.forEach((link, id) => link.toggleAttribute('data-active', id === current?.id));
+  };
+  if (headings.length) {
+    addEventListener('scroll', mark, { passive: true });
+    mark();
+  }
+</script>

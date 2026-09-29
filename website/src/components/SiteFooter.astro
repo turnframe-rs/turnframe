@@ -1,0 +1,56 @@
+---
+import { LICENSE, MSRV, REPO, VERSION } from '../lib/repo.mjs';
+import Logo from './Logo.astro';
+
+const COLUMNS = [
+  ['Learn', [
+    ['Introduction', '/docs'],
+    ['Quickstart', '/docs/quickstart'],
+    ['The Flow Map', '/docs/flow-map'],
+    ['Architecture', '/docs/architecture'],
+    ['Reliability model', '/docs/reliability-model'],
+    ['Persistent interactions', '/docs/interactions'],
+    ['Benchmarks', '/docs/benchmarks'],
+  ]],
+  ['Build', [
+    ['Installation', '/docs/installation'],
+    ['Examples', '/docs/examples'],
+    ['Provider adapters', '/docs/provider-adapters'],
+    ['Persistence', '/docs/persistence'],
+    ['Evaluation', '/docs/evaluation'],
+    ['API reference', '/docs/api'],
+  ]],
+  ['Project', [
+    ['GitHub', REPO],
+    ['Decision records', '/docs/adr'],
+    ['Roadmap', '/docs/roadmap'],
+    ['Changelog', '/docs/changelog'],
+    ['Contributing', '/docs/contributing'],
+    ['Security', '/docs/security-policy'],
+  ]],
+] as const;
+const version = VERSION.split('.').slice(0, 2).join('.');
+const year = new Date().getFullYear();
+---
+<footer class="tf tf-footer">
+  <div class="tf-footer__inner">
+    <div class="tf-footer__top">
+      <div class="tf-footer__brand">
+        <Logo size={22} />
+        <p>Deterministic conversational workflows for Rust. Models propose, code decides, events confirm.</p>
+      </div>
+      {COLUMNS.map(([heading, links]) => (
+        <div class="tf-footer__col">
+          <h2>{heading}</h2>
+          <ul>
+            {links.map(([text, href]) => <li><a href={href}>{text}</a></li>)}
+          </ul>
+        </div>
+      ))}
+    </div>
+    <div class="tf-footer__base">
+      <span>© {year} Turnframe contributors · {LICENSE.replace(' OR ', ' or ')}</span>
+      <span>v{version} · MSRV {MSRV} · <a href="/llms.txt">llms.txt</a></span>
+    </div>
+  </div>
+</footer>

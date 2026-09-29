@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "turnframe-website",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-28",
+
+  "observability": {
+    "logs": { "enabled": true, "invocation_logs": true }
+  },
+
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // A missing page answers with the site's own 404 page, and a real 404 status.
+    "not_found_handling": "404-page",
+    // Pages are built as <path>/index.html and linked without a trailing slash, so /docs is
+    // served directly and /docs/ redirects to it, never the other way round.
+    "html_handling": "drop-trailing-slash",
+    // The Worker sees every request: www redirects to the apex, and documents get their headers.
+    "run_worker_first": true
+  },
+
+  // Kept beside the custom domains, so a deploy can be looked at while a certificate provisions.
+  "workers_dev": true,
+
+  // A bare hostname is a Custom Domain: wrangler creates its DNS record and certificate. `www` is
+  // listed so it resolves at all; the Worker answers it with a 301 to the apex.
+  "routes": [
+    { "pattern": "turnframe.rs", "custom_domain": true },
+    { "pattern": "www.turnframe.rs", "custom_domain": true }
+  ]
+}

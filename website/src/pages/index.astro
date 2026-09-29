@@ -1,0 +1,272 @@
+---
+import SiteSection from '../components/SiteSection.astro';
+import {
+  Claim,
+  CodeBlock,
+  ContrastTable,
+  CrateTable,
+  EffortSettings,
+  Icon,
+  InstallCommand,
+  Manifesto,
+  PipelineRail,
+  SpecSheet,
+  StateTag,
+  TurnPlayer,
+} from '../ds/turnframe.js';
+import Base from '../layouts/Base.astro';
+import { HOME } from '../data/search.js';
+import { KEYWORDS, LICENSE, MSRV, REPO, VERSION, corpusRun, crates } from '../lib/repo.mjs';
+
+const run = corpusRun();
+const version = VERSION.split('.').slice(0, 2).join('.');
+const install = 'cargo add turnframe';
+
+const EFFORT = {
+  low: 'Every understanding task, each read once. Drops the reply review and the step prose.',
+  medium: 'The default. How a message is split and routed is read three times, and a verdict that finds fault is voted on again.',
+  high: 'Votes on segmentation, routing and verification, some reasoning, and a check of the whole reading.',
+};
+// Only the level the release measured carries figures; the others say they were not run.
+const presets = Object.fromEntries(
+  Object.entries(EFFORT).map(([level, does]) => [
+    level,
+    level === run.level && !run.notMeasured.includes(level) ? { ...run, measured: true, does } : { does },
+  ]),
+);
+const foot = `Measured ${run.date} · ${run.model} at ${run.level} · ${run.run} of ${run.runs} runs · ${run.items}-item live corpus, ${run.samplesPerItem} samples each · docs/benchmarks.md`;
+
+const GUARANTEES = [
+  ['Side effects', 'never the wrong record, a stale revision or twice', true],
+  ['Claims', 'a receipt only for a committed event', true],
+  ['Workflow state', 'one phase, projected purely', true],
+  ['Understanding', 'on a mini model; a misreading still meets every check', false],
+];
+// The Flow Map, as the README states it: each step, who holds it, and what it decides.
+const FLOW = [
+  ['Persisted state determines the view', 'Projector · pure', 'The stored record becomes one phase, its open obligations and at most one blocking card. The transcript is history, never state.'],
+  ['Small tasks propose what a message means', 'Model · checked', 'Narrow questions, each with a strict schema and a check in code, read the message into proposed acts that point at the user’s words.'],
+  ['Reducers decide effects', 'Code · deterministic', 'The whole turn is reduced at once into typed commands, each with an expected revision and an idempotency key, under policy.'],
+  ['Interactions authorize consequences', 'User · a click', 'A consequential command waits on a card bound to the exact revision. A click on a card drawn before the record changed is refused.'],
+  ['Committed events decide claims', 'Ledger · events', 'The reply says only what the ledger recorded, so a failed or pending write is never described as done.'],
+];
+const PROVIDERS = ['OpenAI', 'Azure OpenAI', 'Anthropic', 'Gemini', 'Vertex AI', 'Bedrock', 'Ollama'];
+
+const site = Astro.site.href;
+const LICENSES = { MIT: 'https://opensource.org/license/mit', 'Apache-2.0': 'https://www.apache.org/licenses/LICENSE-2.0' };
+const schema = [
+  { '@type': 'WebSite', name: 'Turnframe', url: site, description: HOME.description, inLanguage: 'en-GB' },
+  {
+    '@type': 'SoftwareSourceCode',
+    name: 'Turnframe',
+    description: HOME.description,
+    url: site,
+    codeRepository: REPO,
+    programmingLanguage: { '@type': 'ComputerLanguage', name: 'Rust' },
+    runtimePlatform: `Rust ${MSRV} or newer`,
+    version: VERSION,
+    license: LICENSE.split(' OR ').map((name) => LICENSES[name]).filter(Boolean),
+    keywords: [...KEYWORDS, 'rust', 'ai', 'chatbot', 'openai', 'anthropic'].join(', '),
+  },
+];
+
+const mainRs = `use std::sync::Arc;
+
+use turnframe::flow::WorkflowRegistry;
+use turnframe::runtime::config::OrchestratorConfig;
+use turnframe::runtime::orchestrator::Orchestrator;
+
+// 1. Your domains. Each is a pure projector plus an executor you write.
+let workflows = Arc::new(
+    WorkflowRegistry::builder()
+        .register(TripWorkflow::default(), Arc::clone(&trips))
+        .register(TravelerWorkflow::default(), Arc::clone(&travelers))
+        .build()?,
+);
+
+// 2. Models, persistence, and the records this user may address.
+//    The model never sees a record id: it sees a label.
+let orchestrator = Orchestrator::builder()
+    .workflows(workflows)
+    .providers(providers)
+    .stores(stores)
+    .case_directory(Arc::new(directory))
+    .config(OrchestratorConfig::conservative())
+    .build()?;
+
+// 3. One turn: "Register Marta Bianchi and put her on this trip"
+let answer = orchestrator.handle_turn(input).await?;
+
+// The reply says "added" only because a committed event backs it.
+assert!(answer.receipts().all(|receipt| receipt.is_event_backed()));
+`;
+const cargoToml = `[dependencies]
+turnframe = { version = "0.1", features = ["openai", "postgres", "telemetry"] }
+`;
+const shell = `cargo run -p travel-desk  # the four guarantees, scripted: no key needed
+cp .env.dev .env           # put a key in .env; the console loads it
+cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; else Ollama
+`;
+---
+<Base title={HOME.title} heading="Turnframe: models propose, code decides, events confirm" description={HOME.description} schema={schema}>
+  <section id="top" class="tf tf-hero" data-pagefind-body>
+    <div class="tf-hero__inner">
+      <div class="tf tf-hudbar">
+        <span class="tf-rec">Rec</span>
+        <span class="site-hud-name"><b>Turnframe</b></span>
+        <span>Deterministic conversational workflows for Rust</span>
+        <span>Mini · flash · any provider</span>
+        <span>v{version}<span class="site-hud-extra"> · {LICENSE.replace(' OR ', ' or ')}</span></span>
+      </div>
+      <h1>
+        <span>Models propose.</span>
+        <span><em>Code decides.</em></span>
+        <span>Events <Claim draw>confirm.</Claim></span>
+      </h1>
+      <div class="tf-hero__grid">
+        <div>
+          <p class="tf-hero__lead">
+            Turnframe is a Rust library for LLM conversational workflows that write to real records. Small checked
+            tasks, sized for <b>mini and flash models</b>, read what a message means and stream each step as it is
+            decided. <b>Deterministic reducers decide what happens.</b> The reply claims only what the ledger
+            confirmed. Randomness lives in the reading, <b>never in the effects</b>.
+          </p>
+          <div class="site-hero-cta">
+            <div class="site-hero-cta__row">
+              <a class="tf-btn tf-btn--primary tf-btn--lg" href="/docs">Get started <Icon name="arrow" /></a>
+              <a class="tf-btn tf-btn--secondary tf-btn--lg" href="#flow-map">How it works</a>
+            </div>
+            <InstallCommand client:idle command={install} />
+          </div>
+        </div>
+        <div class="tf-spec">
+          <div class="tf-spec__head"><span>No RNG where it matters</span></div>
+          {GUARANTEES.map(([name, what, hard]) => (
+            <div class="tf-spec__row">
+              <span>{name}<small>{what}</small></span>
+              {hard ? <StateTag state="committed">By construction</StateTag> : <StateTag state="proposed">RNG · fails safe</StateTag>}
+            </div>
+          ))}
+          <div class="tf-spec__row">
+            <span>Live corpus<small>{run.passed} samples · <span class="site-nowrap">{run.model}</span> at {run.level}</small></span>
+            <b class="tf-spec__big">{run.rate}</b>
+          </div>
+          <div class="tf-spec__foot">
+            <a href="/docs/reliability-model">docs/reliability-model.md</a> · <a href="/docs/benchmarks">docs/benchmarks.md</a>
+          </div>
+        </div>
+      </div>
+      <div class="tf-hero__stage">
+        <div class="tf-frame">
+          <span class="tf-frame__label"><b>Rec</b>Fig. 1 · four turns of the travel desk, streamed frame by frame</span>
+          <span class="tf-frame__c tf-frame__c--tl"></span>
+          <span class="tf-frame__c tf-frame__c--tr"></span>
+          <span class="tf-frame__c tf-frame__c--bl"></span>
+          <span class="tf-frame__c tf-frame__c--br"></span>
+          <TurnPlayer client:visible height={500} />
+        </div>
+      </div>
+      <div class="tf-hero__runs">
+        <b>Runs on</b>
+        {PROVIDERS.map((name) => <span>{name}</span>)}
+        <span class="tf-faint">· the examples need no key</span>
+      </div>
+    </div>
+  </section>
+
+  <div data-pagefind-body>
+    <Manifesto />
+
+    <SiteSection id="flow-map" number="01" eyebrow="The Flow Map"
+      title="Five steps," turn="one direction."
+      lead="Turnframe is built around the Flow Map: every turn runs the same five steps, and each hands the next only what it may decide. A model’s reading reaches a record only through a reducer, a policy and, for anything consequential, a card the user clicks.">
+      <ol class="site-flow">
+        {FLOW.map(([step, who, what]) => (
+          <li>
+            <span class="site-flow__who">{who}</span>
+            <b>{step}</b>
+            <span>{what}</span>
+          </li>
+        ))}
+      </ol>
+      <p class="home-more"><a href="/docs/flow-map">The Flow Map, step by step <Icon name="arrow" /></a></p>
+    </SiteSection>
+
+    <SiteSection id="architecture" number="02" eyebrow="Frame data"
+      title="Nine small questions," turn="not one large prompt."
+      lead="A message goes through a fixed chain of narrow tasks, each with a strict schema and a check in code. Dates and amounts are computed by code from what the model points at. No task needs more than a few hundred tokens, so a small, cheap model can run a real workflow.">
+      <PipelineRail />
+      <p class="home-more"><a href="/docs/architecture">The turn pipeline, step by step <Icon name="arrow" /></a></p>
+    </SiteSection>
+
+    <SiteSection id="reliability" number="03" eyebrow="Reliability model"
+      title="No RNG where it matters." turn="Honest RNG where it can’t hurt."
+      lead="Reliability is not one accuracy number. Side effects, claims and workflow state are correct by construction: a violation is a defect a test can find, never model variance. Understanding is probabilistic, and it is only allowed to fail safe.">
+      <SpecSheet />
+      <p class="home-more"><a href="/docs/reliability-model">The five properties and their release gates <Icon name="arrow" /></a></p>
+    </SiteSection>
+
+    <SiteSection id="cost" number="04" eyebrow="Low spec"
+      title="Mini models." turn="Frame‑perfect effects."
+      lead={`No task needs more than a few hundred tokens, so the reading runs on mini and flash models: on this release's corpus, ${run.model} passed ${run.passed} samples at ${run.level}. Accuracy is bought with checked calls on the same small model, and effects are identical at every setting. How each run was measured, and what the figures cannot show, is in the benchmarks.`}>
+      <EffortSettings client:visible presets={presets} pricing={run.pricing} foot={foot} />
+      <p class="home-more"><a href="/docs/benchmarks">What is measured, and what is not claimed <Icon name="arrow" /></a></p>
+    </SiteSection>
+
+    <SiteSection number="05" eyebrow="Matchup"
+      title="Not an agent framework." turn="The model never holds the controller."
+      lead="Turnframe is for conversational applications that write to real records. The difference is where authority sits.">
+      <ContrastTable />
+    </SiteSection>
+
+    <SiteSection id="code" number="06" eyebrow="Controls" title="Plain Rust." turn="No macros, no DSL.">
+      <div class="tf-split">
+        <ol class="tf-points">
+          <li><span><b>The projector</b> turns the stored record into a view: one phase, its open obligations, at most one blocking card.</span></li>
+          <li><span><b>Understanding</b> splits the message, routes each request to an offered operation, and points at the value in the user’s own words.</span></li>
+          <li><span><b>The reducer</b> resolves the record and compiles a typed command with an expected revision and an idempotency key.</span></li>
+          <li><span><b>The receipt</b> is rendered from the committed event, never from a model’s prose. A timed-out call stays unknown until it is reconciled.</span></li>
+        </ol>
+        <CodeBlock
+          client:visible
+          tabs={[
+            { name: 'main.rs', lang: 'rust', code: mainRs },
+            { name: 'Cargo.toml', lang: 'toml', code: cargoToml },
+            { name: 'examples', lang: 'sh', code: shell },
+          ]}
+          caption="Abridged. TripWorkflow and TravelerWorkflow come from the test kit here and are yours in an application. The runnable version is the facade’s quickstart, a doc-test that needs no key, database or network."
+        />
+      </div>
+      <p class="home-more"><a href="/docs/quickstart">The quickstart, in full <Icon name="arrow" /></a></p>
+    </SiteSection>
+
+    <SiteSection id="crates" number="07" eyebrow="Loadout"
+      title="Install the facade." turn="Pick features."
+      lead="One dependency, the family behind feature flags. The core crate is pure types and the projector: it runs no async runtime and opens no connection.">
+      <CrateTable crates={crates()} />
+    </SiteSection>
+  </div>
+
+  <section class="tf tf-section" id="start">
+    <div class="tf-section__inner">
+      <div class="tf tf-cta">
+        <div>
+          <span class="tf-cta__eyebrow">Press start</span>
+          <h2>Run a turn. <em>Frame by frame.</em></h2>
+          <p>
+            Read the architecture guide, then run the travel desk: four turns, four guarantees, and no key needed. When
+            you want to see what a real model does with the contract, the console runs the same desk against
+            whichever provider you have a key for. A mini one is enough.
+          </p>
+        </div>
+        <div class="tf-cta__actions">
+          <div class="tf-row">
+            <a class="tf-btn tf-btn--primary tf-btn--lg" href="/docs/architecture"><Icon name="book" /> Read the architecture</a>
+            <a class="tf-btn tf-btn--secondary tf-btn--lg" href="/docs/examples"><Icon name="terminal" /> Run the examples</a>
+          </div>
+          <InstallCommand client:idle command="cargo run -p travel-desk" />
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

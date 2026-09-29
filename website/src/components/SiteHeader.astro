@@ -1,0 +1,92 @@
+---
+import { Icon } from '../ds/turnframe.js';
+import { REPO, VERSION } from '../lib/repo.mjs';
+import Logo from './Logo.astro';
+
+const LINKS = [
+  ['Docs', '/docs'],
+  ['Flow Map', '/docs/flow-map'],
+  ['Architecture', '/docs/architecture'],
+  ['Examples', '/docs/examples'],
+  ['Decisions', '/docs/adr'],
+  ['Changelog', '/docs/changelog'],
+];
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const current = (href: string) =>
+  href === '/docs' ? path === '/docs' || (path.startsWith('/docs/') && !LINKS.slice(1).some(([, h]) => path.startsWith(h))) : path.startsWith(href);
+const version = VERSION.split('.').slice(0, 2).join('.');
+---
+<header class="tf tf-header" data-header>
+  <div class="tf-header__inner">
+    <a href="/" aria-label="Turnframe home" class="site-home"><Logo size={24} /></a>
+    <nav class="tf-header__nav" aria-label="Primary">
+      {LINKS.map(([text, href]) => (
+        <a class="tf-header__link" href={href} aria-current={current(href) ? 'page' : undefined}>{text}</a>
+      ))}
+    </nav>
+    <div class="tf-header__end">
+      <button type="button" class="site-search" data-search-open aria-keyshortcuts="Control+K Meta+K">
+        <svg class="tf-icon" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+        <span class="site-search__text">Search</span>
+        <kbd class="site-search__kbd" data-search-key aria-hidden="true">Ctrl K</kbd>
+      </button>
+      <span class="tf-header__ver">v{version}</span>
+      <div class="tf-seg site-theme" role="radiogroup" aria-label="Colour theme" data-theme-toggle>
+        <button type="button" role="radio" class="tf-seg__opt" data-value="system" title="System" aria-label="System"><Icon name="system" size={14} /></button>
+        <button type="button" role="radio" class="tf-seg__opt" data-value="light" title="Light" aria-label="Light"><Icon name="sun" size={14} /></button>
+        <button type="button" role="radio" class="tf-seg__opt" data-value="dark" title="Dark" aria-label="Dark"><Icon name="moon" size={14} /></button>
+      </div>
+      <a class="tf-btn tf-btn--secondary tf-btn--sm tf-header__cta" href={REPO} rel="noopener">GitHub <Icon name="external" /></a>
+      <button type="button" class="tf-btn tf-btn--ghost tf-btn--sm tf-btn--icon tf-header__menu" aria-label="Menu" aria-expanded="false" data-menu>
+        <span class="site-menu__open"><Icon name="menu" /></span><span class="site-menu__close"><Icon name="x" /></span>
+      </button>
+    </div>
+  </div>
+  <nav class="tf-header__drawer" data-open="false" aria-label="Primary, mobile" data-drawer>
+    {LINKS.map(([text, href]) => (
+      <a class="tf-header__link" href={href} aria-current={current(href) ? 'page' : undefined}>{text}</a>
+    ))}
+    <a class="tf-header__link" href={REPO} rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<script>
+  const root = document.documentElement;
+  const toggle = document.querySelector('[data-theme-toggle]');
+  const system = matchMedia('(prefers-color-scheme: light)');
+  const stored = () => {
+    try {
+      return localStorage.getItem('tf-theme') ?? 'system';
+    } catch {
+      return 'system';
+    }
+  };
+  const apply = (choice: string) => {
+    const theme = choice === 'system' ? (system.matches ? 'light' : 'dark') : choice;
+    root.setAttribute('data-theme', theme);
+    toggle?.querySelectorAll<HTMLButtonElement>('[data-value]').forEach((button) => {
+      button.setAttribute('aria-checked', String(button.dataset.value === choice));
+    });
+  };
+  apply(stored());
+  system.addEventListener('change', () => stored() === 'system' && apply('system'));
+  toggle?.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-value]');
+    if (!button?.dataset.value) return;
+    try {
+      localStorage.setItem('tf-theme', button.dataset.value);
+    } catch {}
+    apply(button.dataset.value);
+  });
+
+  const menu = document.querySelector<HTMLButtonElement>('[data-menu]');
+  const drawer = document.querySelector<HTMLElement>('[data-drawer]');
+  menu?.addEventListener('click', () => {
+    const open = drawer?.dataset.open !== 'true';
+    if (drawer) drawer.dataset.open = String(open);
+    menu.setAttribute('aria-expanded', String(open));
+  });
+
+  const key = document.querySelector('[data-search-key]');
+  if (key && /Mac|iPhone|iPad/.test(navigator.platform)) key.textContent = '⌘K';
+</script>

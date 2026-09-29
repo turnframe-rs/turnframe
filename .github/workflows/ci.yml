@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # The website builds and deploys in its own workflow; a change to it alone has no Rust in it.
+    paths-ignore: ["website/**", ".github/workflows/website.yml"]
   pull_request:
+    paths-ignore: ["website/**", ".github/workflows/website.yml"]
 
 env:
   CARGO_TERM_COLOR: always

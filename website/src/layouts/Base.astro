@@ -1,0 +1,101 @@
+---
+import '../styles/tokens.css';
+import '../styles/ds.css';
+import '../styles/site.css';
+
+import Search from '../components/Search.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  /** The page's own title, without the site's name: the social card shows it. */
+  heading?: string;
+  noindex?: boolean;
+  /** An article is a docs page: it carries the day it last changed. */
+  article?: { modified?: string | null; section?: string };
+  /** Structured data for search engines: schema.org objects, each emitted as JSON-LD. */
+  schema?: object[];
+}
+const { title, description, heading = title, noindex = false, article, schema = [] } = Astro.props;
+const canonical = new URL(Astro.url.pathname.replace(/\/$/, '') || '/', Astro.site).href;
+const image = new URL('/og.png', Astro.site).href;
+---
+<!doctype html>
+<html lang="en-GB" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="robots" content={noindex ? 'noindex' : 'index, follow, max-image-preview:large, max-snippet:-1'} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0c12" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#eef0eb" media="(prefers-color-scheme: light)" />
+    <link rel="preload" href="/fonts/IBMPlexSans-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/MartianMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
+    <link rel="sitemap" href="/sitemap.xml" />
+
+    <meta property="og:site_name" content="Turnframe" />
+    <meta property="og:type" content={article ? 'article' : 'website'} />
+    {article?.modified && <meta property="article:modified_time" content={article.modified} />}
+    {article?.section && <meta property="article:section" content={article.section} />}
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:title" content={heading} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={heading} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+
+    <script is:inline>
+      // Before first paint, so a reader who chose Paper never sees a Carbon flash.
+      (function () {
+        var choice = 'system';
+        try {
+          choice = localStorage.getItem('tf-theme') || 'system';
+        } catch (e) {}
+        var theme = choice === 'light' || choice === 'dark' ? choice : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+    {schema.map((object) => (
+      <script type="application/ld+json" set:html={JSON.stringify({ '@context': 'https://schema.org', ...object }).replace(/</g, '\\u003c')} />
+    ))}
+    <slot name="head" />
+  </head>
+  <body class="tf-ground">
+    <a class="skip" href="#main">Skip to content</a>
+    <SiteHeader />
+    <main id="main">
+      <slot />
+    </main>
+    <SiteFooter />
+    <Search />
+    <script>
+      // Copy buttons on code rendered at build time.
+      document.addEventListener('click', async (event) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-copy]');
+        if (!button) return;
+        const source = button.closest('[data-code]')?.querySelector('textarea[data-source]');
+        if (!source) return;
+        try {
+          await navigator.clipboard.writeText(source.textContent ?? '');
+          const label = button.querySelector('span');
+          if (label) {
+            label.textContent = 'Copied';
+            setTimeout(() => (label.textContent = 'Copy'), 1600);
+          }
+        } catch {}
+      });
+    </script>
+  </body>
+</html>

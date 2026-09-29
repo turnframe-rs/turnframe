@@ -1,0 +1,12 @@
+---
+// The mark [◆] and the lowercase lockup, inline so the inks follow the theme.
+interface Props { size?: number; variant?: 'lockup' | 'mark' }
+const { size = 24, variant = 'lockup' } = Astro.props;
+---
+<span class="tf-logo" role="img" aria-label="Turnframe" style={variant === 'lockup' ? `font-size:${size * 0.8}px;gap:${size * 0.34}px` : undefined}>
+  <svg class="tf-logo__mark" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+    <path class="br" d="M9 3H4v26h5M23 3h5v26h-5" />
+    <path class="kf" d="M16 9.5L22.5 16L16 22.5L9.5 16Z" />
+  </svg>
+  {variant === 'lockup' && <span class="tf-logo__word" aria-hidden="true">turnframe</span>}
+</span>

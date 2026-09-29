@@ -1,0 +1,18 @@
+---
+import { Icon } from '../ds/turnframe.js';
+import Base from '../layouts/Base.astro';
+---
+<Base title="Not found · Turnframe" description="This page does not exist." noindex>
+  <section class="tf lost">
+    <div class="lost__inner">
+      <p class="lost__count" aria-hidden="true">F<span>404</span></p>
+      <h1>This frame was never drawn.</h1>
+      <p>Nothing is published at this address. It may have moved when the docs were rebuilt, or the link had a typo.</p>
+      <div class="tf-row">
+        <a class="tf-btn tf-btn--primary" href="/docs">Read the docs <Icon name="arrow" /></a>
+        <a class="tf-btn tf-btn--secondary" href="/">Home</a>
+        <button type="button" class="tf-btn tf-btn--ghost" data-search-open>Search</button>
+      </div>
+    </div>
+  </section>
+</Base>

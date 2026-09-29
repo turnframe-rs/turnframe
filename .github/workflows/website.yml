@@ -1,0 +1,71 @@
+name: Website
+
+# turnframe.rs is built from this repository: its guides, decision records, changelog, crate table
+# and measured figures are read from the checkout at build time. A change to any of those builds
+# and tests the site. Deploying is manual: run this workflow on main from the Actions tab.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "Cargo.toml"
+      - "crates/*/Cargo.toml"
+      - "crates/turnframe/src/**"
+      - "crates/turnframe-test/src/**"
+      - "crates/turnframe-store-postgres/docs/**"
+      - ".github/workflows/website.yml"
+  pull_request:
+    paths:
+      - "website/**"
+      - "docs/**"
+      - ".github/workflows/website.yml"
+  workflow_dispatch:
+
+concurrency:
+  # A second push while one is deploying should win, not queue behind it.
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      # The whole history: each page's "last changed" date and the sitemap come from git log.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: website/.nvmrc
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - run: npm ci
+
+      # Builds the pages and the search index. The tests read what the build wrote, so they run
+      # after it, and the deploy after both.
+      - run: npm run build
+      - run: npm test
+
+      - name: Deploy to Cloudflare
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: website
+
+      - name: Tell search engines what changed
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: node scripts/indexnow.mjs
