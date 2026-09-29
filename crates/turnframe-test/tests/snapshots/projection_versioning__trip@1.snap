@@ -1,0 +1,37 @@
+---
+source: crates/turnframe-test/tests/projection_versioning.rs
+expression: fingerprint
+---
+workflow: trip
+version: "1"
+states:
+  - state: absent
+    phase: pre_draft
+    ownership: system
+    obligations: []
+    notices: []
+  - state: incomplete_case
+    phase: collecting
+    ownership: system
+    obligations:
+      - "\"set_name\""
+      - "\"set_travel_date\""
+    notices: []
+  - state: complete_case
+    phase: collecting
+    ownership: system
+    obligations: []
+    notices: []
+  - state: awaiting_rebooking_confirmation
+    phase: awaiting_rebooking_confirmation
+    ownership: user
+    obligations: []
+    blocking:
+      key: trip.rebooking_confirmation
+      kind: confirm_command
+      blocking: true
+      revision_independent: false
+      text_resolution:
+        kind: never
+      confirms_risk: external_regulated
+    notices: []

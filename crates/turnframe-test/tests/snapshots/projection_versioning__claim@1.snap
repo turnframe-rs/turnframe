@@ -1,0 +1,62 @@
+---
+source: crates/turnframe-test/tests/projection_versioning.rs
+expression: fingerprint
+---
+workflow: claim
+version: "1"
+states:
+  - state: absent
+    phase: pre_draft
+    ownership: system
+    obligations: []
+    notices: []
+  - state: awaiting_extraction
+    phase: extracting
+    ownership: system
+    obligations:
+      - "{\"extract_fields\":{\"attachment_id\":\"att-receipt-1\"}}"
+    notices: []
+  - state: under_review
+    phase: awaiting_review
+    ownership: user
+    obligations:
+      - "{\"review_proposed_field\":{\"field\":\"merchant\"}}"
+      - "{\"review_proposed_field\":{\"field\":\"total\"}}"
+      - "{\"review_proposed_field\":{\"field\":\"receipt_date\"}}"
+    blocking:
+      key: claim.proposal_review
+      kind: review_changes
+      blocking: true
+      revision_independent: false
+      text_resolution:
+        kind: never
+      confirms_risk: sensitive_data_change
+    notices:
+      - code: claim.fields_proposed_from_attachment
+        severity: info
+  - state: under_review_incomplete
+    phase: awaiting_review
+    ownership: user
+    obligations:
+      - "{\"review_proposed_field\":{\"field\":\"merchant\"}}"
+      - "{\"review_proposed_field\":{\"field\":\"total\"}}"
+      - "{\"provide_field\":{\"field\":\"receipt_date\"}}"
+    blocking:
+      key: claim.proposal_review
+      kind: review_changes
+      blocking: true
+      revision_independent: false
+      text_resolution:
+        kind: never
+      confirms_risk: sensitive_data_change
+    notices:
+      - code: claim.fields_proposed_from_attachment
+        severity: info
+  - state: abandoned
+    phase: extracting
+    ownership: system
+    obligations:
+      - "{\"extract_fields\":{\"attachment_id\":\"att-receipt-1\"}}"
+    notices:
+      - code: claim.proposal_abandoned
+        severity: info

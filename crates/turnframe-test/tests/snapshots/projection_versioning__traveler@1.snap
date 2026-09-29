@@ -1,0 +1,49 @@
+---
+source: crates/turnframe-test/tests/projection_versioning.rs
+expression: fingerprint
+---
+workflow: traveler
+version: "1"
+states:
+  - state: absent
+    phase: pre_draft
+    ownership: system
+    obligations: []
+    notices: []
+  - state: incomplete_draft
+    phase: collecting
+    ownership: system
+    obligations:
+      - "\"set_email\""
+      - "\"set_loyalty_number\""
+    notices: []
+  - state: declined_because_it_does_not_apply
+    phase: awaiting_activation
+    ownership: user
+    obligations: []
+    blocking:
+      key: traveler.activation_confirmation
+      kind: confirm_command
+      blocking: true
+      revision_independent: false
+      text_resolution:
+        kind: never
+      confirms_risk: reversible_low_risk
+    notices:
+      - code: traveler.loyalty_number_declined.not_applicable
+        severity: info
+  - state: declined_because_it_is_not_known
+    phase: awaiting_activation
+    ownership: user
+    obligations: []
+    blocking:
+      key: traveler.activation_confirmation
+      kind: confirm_command
+      blocking: true
+      revision_independent: false
+      text_resolution:
+        kind: never
+      confirms_risk: reversible_low_risk
+    notices:
+      - code: traveler.loyalty_number_declined.unknown
+        severity: info

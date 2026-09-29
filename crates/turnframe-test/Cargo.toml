@@ -1,0 +1,47 @@
+[package]
+name = "turnframe-test"
+description = "Test kit for Turnframe: fixtures, scripted providers, fake stores, workflow exploration and replay assertions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+turnframe-core = { workspace = true }
+# The provider conformance harness is re-exported by `providers::conformance`,
+# so the `conformance` feature (and its wiremock dependency) is not optional
+# here: this crate exists to be depended on by tests.
+turnframe-provider = { workspace = true, features = ["conformance"] }
+turnframe-store = { workspace = true }
+turnframe-tasks = { workspace = true }
+turnframe-understand = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+indexmap = { workspace = true }
+proptest = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+uuid = { workspace = true }
+# `providers::conformance::DeclaredRows` implements `WireFixtures`, whose one
+# required method takes a `wiremock::MockServer`, so the mock server is part of
+# this crate's own API rather than only of its tests.
+wiremock = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true

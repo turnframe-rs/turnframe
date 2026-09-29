@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/turnframe-core",
+    "crates/turnframe-runtime",
     "crates/turnframe-macros",
     "crates/turnframe-store",
     "crates/turnframe-store-postgres",
@@ -12,6 +13,7 @@ members = [
     "crates/turnframe-provider-gemini",
     "crates/turnframe-provider-bedrock",
     "crates/turnframe-provider-ollama",
+    "crates/turnframe-test",
     "crates/turnframe-telemetry",
     "crates/turnframe-tasks",
     "crates/turnframe-understand",
