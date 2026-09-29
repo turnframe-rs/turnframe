@@ -1,0 +1,174 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUSTDOCFLAGS: "-D warnings"
+  CARGO_INCREMENTAL: 0
+  # A test binary per behaviour means well over a hundred links, and a runner that
+  # runs out of disk kills the linker with `signal 7 [Bus error]`. No debuginfo keeps
+  # them small (a panic still names its file and line); the test job also frees disk.
+  CARGO_PROFILE_TEST_DEBUG: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG: 0
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy (all targets, all features)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  core-purity:
+    name: core dependency purity
+    runs-on: ubuntu-latest
+    # The core's freedom from async runtimes, HTTP clients, database drivers and
+    # application dependencies is what makes adoption tractable, so it is a gate
+    # on every pull request rather than a convention that decays in review. Its
+    # own job, because a failure here means something different from a failing
+    # unit test and should say so on the check list.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p turnframe-core --test dependency_purity -- --nocapture
+
+  test:
+    name: test (stable)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: turnframe
+          POSTGRES_PASSWORD: turnframe
+          POSTGRES_DB: turnframe_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U turnframe"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TURNFRAME_TEST_DATABASE_URL: postgres://turnframe:turnframe@localhost:5432/turnframe_test
+    steps:
+      - name: free disk the runner's preinstalled SDKs take
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-features --no-fail-fast
+      - name: doc tests with all features
+        run: cargo test --workspace --all-features --doc
+
+  docs:
+    name: rustdoc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --workspace --all-features --no-deps
+
+  msrv:
+    name: MSRV build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: read rust-version from the workspace manifest
+        id: msrv
+        run: |
+          v=$(grep -E '^rust-version' Cargo.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-features --all-targets
+
+  deny:
+    name: cargo-deny (licenses, bans, sources, advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+
+  audit:
+    name: cargo-audit
+    runs-on: ubuntu-latest
+    # The action reports what it found by creating a check run, and a found
+    # advisory is only a warning to it — so without this the job fails on the
+    # report rather than on the finding, and says "Resource not accessible by
+    # integration" instead of naming a crate.
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # RUSTSEC-2023-0071 (`rsa`, Marvin Attack) has no patched release.
+          # It reaches this lockfile as an *optional* dependency of
+          # `sqlx-mysql`, which nothing here enables: the store is PostgreSQL
+          # only. A lockfile is feature-independent, so a scanner that reads
+          # one sees a crate that is never compiled — which is why cargo-deny,
+          # which resolves features, does not report it. Keep `deny.toml`'s
+          # `advisories.ignore` empty so that it stays the check that would
+          # catch this the day something does enable MySQL.
+          ignore: RUSTSEC-2023-0071
+
+  semver:
+    name: cargo-semver-checks
+    runs-on: ubuntu-latest
+    # Baseline is the previous published release; on a fresh workspace this job
+    # only validates the manifests until a first version is on crates.io.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: turnframe-core,turnframe-runtime,turnframe-store,turnframe-provider,turnframe
+        continue-on-error: true
+
+  bench-smoke:
+    name: benchmarks compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo bench --workspace --no-run
