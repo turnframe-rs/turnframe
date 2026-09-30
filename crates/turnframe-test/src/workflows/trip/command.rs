@@ -162,6 +162,9 @@ pub enum TripEvent {
         quantity: u32,
         /// Its unit price in cents.
         unit_price_cents: i64,
+        /// Who pays for it, when it was said as it was added.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        payer: Option<Payer>,
     },
     /// An extra was given its payer.
     PayerAssigned {
@@ -281,6 +284,9 @@ pub struct AddExtraArgs {
     pub quantity: u32,
     /// Price of one.
     pub unit_price: Money,
+    /// Who pays, when the message says so.
+    #[serde(default)]
+    pub payer: Option<Payer>,
 }
 
 /// Arguments of [`operations::ASSIGN_PAYER`].

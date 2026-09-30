@@ -522,6 +522,7 @@ mod tests {
             expectations: Vec::new(),
             replay_token: turnframe_core::response::ReplayToken::from("t"),
             done: Vec::new(),
+            offers: Vec::new(),
         };
         let events = TurnStream::immediate(turn).collect_events().await;
         assert_eq!(events.len(), 3);

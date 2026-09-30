@@ -14,17 +14,11 @@
 
 mod support;
 
-use std::sync::Arc;
-
-use support::SampleHarness;
+use support::{DEFAULT_VENDOR, SampleHarness, VENDORS, load_dotenv, provider_for};
 use turnframe_eval::config::EvalConfig;
 use turnframe_eval::corpus::Suite;
 use turnframe_eval::runner::Runner;
-use turnframe_provider::provider::ModelProvider;
 use turnframe_provider::secret::ApiKey;
-use turnframe_provider_anthropic::AnthropicProvider;
-use turnframe_provider_gemini::GeminiProvider;
-use turnframe_provider_openai::OpenAiProvider;
 
 /// The variable that turns this test on. Its absence is the normal case.
 const KEY_VARIABLE: &str = "TURNFRAME_EVAL_LIVE_KEY";
@@ -52,45 +46,6 @@ const SAMPLES_VARIABLE: &str = "TURNFRAME_EVAL_LIVE_SAMPLES";
 /// How many samples may run at once, one when unset.
 const CONCURRENCY_VARIABLE: &str = "TURNFRAME_EVAL_LIVE_CONCURRENCY";
 
-/// The three adapters this can run against, with the model each falls back to.
-///
-/// The defaults are small, cheap and current: the point is to exercise the
-/// pipeline end to end against a real model, not to benchmark a frontier one.
-const VENDORS: [(&str, &str); 3] = [
-    ("openai", "gpt-4o-mini"),
-    ("anthropic", "claude-haiku-4-5-20251001"),
-    ("gemini", "gemini-2.5-flash"),
-];
-
-/// The vendor used when the caller names none.
-const DEFAULT_VENDOR: &str = "openai";
-
-/// Builds the provider for `vendor`, or `None` when the name is not one of the
-/// three.
-fn provider_for(vendor: &str, model: &str, key: &ApiKey) -> Option<Arc<dyn ModelProvider>> {
-    match vendor {
-        "openai" => OpenAiProvider::openai()
-            .api_key(key.clone())
-            .model(model)
-            .build()
-            .ok()
-            .map(|built| Arc::new(built) as Arc<dyn ModelProvider>),
-        "anthropic" => AnthropicProvider::anthropic()
-            .api_key(key.clone())
-            .model(model)
-            .build()
-            .ok()
-            .map(|built| Arc::new(built) as Arc<dyn ModelProvider>),
-        "gemini" => GeminiProvider::gemini()
-            .api_key(key.clone())
-            .model(model)
-            .build()
-            .ok()
-            .map(|built| Arc::new(built) as Arc<dyn ModelProvider>),
-        _ => None,
-    }
-}
-
 fn corpus_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -114,15 +69,6 @@ async fn the_live_corpus_loads_and_every_setup_prepares() {
             panic!("{}: {error}", item.id.0);
         }
     }
-}
-
-/// Loads the repository's `.env` once per test binary, before any test reads a
-/// variable or opens a connection. A variable already set in the shell wins.
-fn load_dotenv() {
-    static LOADED: std::sync::Once = std::sync::Once::new();
-    LOADED.call_once(|| {
-        let _ = dotenvy::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/../../.env"));
-    });
 }
 
 #[tokio::test]

@@ -4,20 +4,22 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use turnframe_core::ids::{OperationKey, TargetToken, WorkflowKey};
-use turnframe_core::operation::{ArgumentSpec, OperationSpec, ValueShape};
+use turnframe_core::operation::{ArgumentSpec, DateExpr, OperationSpec, ValueShape};
 use turnframe_core::plan::{ActMutability, TargetPolicy};
 use turnframe_core::understanding::{
-    ActAction, ActId, ActStatus, ActTarget, MessageRef, NotUnderstoodReason, RecordValue,
-    UnderstoodAct, UnderstoodArgument, UnitId, WordRange,
+    ActAction, ActId, ActStatus, ActTarget, ArgumentValue, MessageRef, NotUnderstoodReason,
+    RecordValue, UnderstoodAct, UnderstoodArgument, UnitId, WordRange,
 };
 use turnframe_tasks::{TaskCall, TaskId, TaskOutcome};
 
 use crate::check::argument_of;
-use crate::input::{PendingAct, Speaker, UnderstandingInput, WorkflowBrief};
+use crate::input::{Expectation, PendingAct, Speaker, UnderstandingInput, WorkflowBrief};
 use crate::pipeline::{Context, VerifyPolicy};
 use crate::progress::{Located, Step};
 use crate::render;
-use crate::tasks::extract::{Extract, ExtractInput, Extraction, RecordChoice, RecordContext};
+use crate::tasks::extract::{
+    Extract, ExtractInput, Extraction, Given, RecordChoice, RecordContext,
+};
 use crate::tasks::locate::{AMBIGUOUS, BY_NAME, Candidate, Locate, LocateInput, NEW};
 use crate::tasks::verify::{ArgumentVerdict, Overall, Verdict, Verify, VerifyInput};
 use crate::values::{Extracted, convert};
@@ -260,17 +262,36 @@ impl<'a> Chain<'_, 'a> {
         if verdict.overall == Overall::NotRequested {
             return self.not_understood(NotUnderstoodReason::NotRequested, Some(act.target));
         }
-        let at_fault = verdict.at_fault();
-        for name in &at_fault {
-            act.arguments.remove(name);
+        for name in verdict.at_fault() {
+            act.arguments.remove(&name);
         }
-        if !at_fault.is_empty() {
+        let asked = self.to_ask(&verdict);
+        if !asked.is_empty() {
             act.status = ActStatus::NeedsValue {
-                arguments: at_fault,
+                arguments: asked,
                 reason: None,
             };
         }
         Chained::Act(act)
+    }
+
+    /// The values a verdict found wanting that are asked back: an optional one the user did
+    /// not give is only left out.
+    fn to_ask(&self, verdict: &Verdict) -> Vec<String> {
+        let optional = |name: &str| {
+            self.plan
+                .spec
+                .and_then(|spec| spec.argument_named(name))
+                .is_some_and(|argument| !argument.required)
+        };
+        verdict
+            .at_fault()
+            .into_iter()
+            .filter(|name| {
+                !(verdict.arguments.get(name) == Some(&ArgumentVerdict::NotStated)
+                    && optional(name))
+            })
+            .collect()
     }
 
     async fn run_from(mut self, target: ActTarget) -> Chained {
@@ -278,12 +299,14 @@ impl<'a> Chain<'_, 'a> {
             act: self.plan.id,
             record: self.located(&target),
         });
-        let input = self.extract_input(&target);
+        let mut input = self.extract_input(&target);
         let mut extraction = None;
         let mut extracted = Extracted::default();
-        if let Some(input) = &input {
+        if let Some(input) = &mut input {
             match self.extract(input, "extract", None).await {
                 Ok((output, values)) => {
+                    let values = self.dated_as_corrected(input, &output, values).await;
+                    let input = &*input;
                     let only_elsewhere =
                         values.arguments.is_empty() && !values.elsewhere.is_empty();
                     // A guessed part pointing only at another part's words is that part.
@@ -296,6 +319,8 @@ impl<'a> Chain<'_, 'a> {
                     }
                     let (output, values) = self.own_end(input, output, values).await;
                     let (output, values) = self.records_read_again(input, output, values).await;
+                    let (output, values) =
+                        self.asked_read_again(input, &target, output, values).await;
                     extraction = Some(output);
                     extracted = values;
                 }
@@ -342,12 +367,99 @@ impl<'a> Chain<'_, 'a> {
         }
         let mut arguments = self.carried.clone();
         arguments.extend(extracted.arguments.clone());
+        if !extracted.aside.is_empty()
+            && let Ok(mut aside) = self.cx.aside.lock()
+        {
+            aside.insert(self.plan.id, extracted.aside.clone());
+        }
         let mut act = self.act(target, arguments, status);
         if act.status == ActStatus::Ready && self.cx.checker.is_active() {
             self.checked(&mut act, input.as_ref(), extraction.as_ref())
                 .await;
         }
         Chained::Act(act)
+    }
+
+    /// The dates the act the last turn did gave, by argument, when this corrects it.
+    fn corrected_dates(&self, target: &ActTarget) -> BTreeMap<String, chrono::NaiveDate> {
+        self.corrected(target)
+            .into_iter()
+            .flat_map(|done| &done.given)
+            .filter_map(|(name, given)| match &given.value {
+                ArgumentValue::Json(serde_json::Value::String(text)) => {
+                    Some((name.clone(), text.parse().ok()?))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// A correction giving a date without its year, of a request earlier in the message,
+    /// reads that request's date once: the correction keeps its year.
+    async fn dated_as_corrected(
+        &mut self,
+        input: &mut ExtractInput<'a>,
+        output: &Extraction,
+        values: Extracted,
+    ) -> Extracted {
+        let Some(continued) = self
+            .plan
+            .continues
+            .filter(|_| self.plan.label == "Correction")
+        else {
+            return values;
+        };
+        // A date given with no year, or with one its words do not say, takes the corrected one.
+        let turn = self.cx.turn;
+        let unsaid = |given: &Given| match given {
+            Given::Date {
+                date: DateExpr::Absolute { year: None, .. },
+                ..
+            } => true,
+            Given::Date {
+                date:
+                    DateExpr::Absolute {
+                        year: Some(year),
+                        day,
+                        ..
+                    },
+                message,
+                ..
+            } if message == crate::tasks::extract::CURRENT => given
+                .pointer()
+                .and_then(|(_, span)| turn.message.slice(span).ok())
+                .is_some_and(|said| !crate::values::says_year(said, *year, *day)),
+            _ => false,
+        };
+        let undated: Vec<&String> = output
+            .arguments
+            .iter()
+            .filter(|(name, given)| unsaid(given) && !input.corrected.contains_key(*name))
+            .map(|(name, _)| name)
+            .collect();
+        if undated.is_empty() {
+            return values;
+        }
+        let mut earlier = input.clone();
+        earlier.label = "Request";
+        earlier.words = continued;
+        earlier.continues = None;
+        earlier.others.push(input.words);
+        earlier
+            .arguments
+            .retain(|argument| undated.contains(&&argument.name));
+        let Ok((_, read)) = self.extract(&earlier, "extract.corrected", None).await else {
+            return values;
+        };
+        for name in undated {
+            if let Some(ArgumentValue::Json(serde_json::Value::String(text))) =
+                read.arguments.get(name).map(|given| &given.value)
+                && let Ok(date) = text.parse()
+            {
+                input.corrected.insert(name.clone(), date);
+            }
+        }
+        convert(self.cx.turn, input, output).unwrap_or(values)
     }
 
     /// The act the last turn did that this correction changes: the one of its operation on
@@ -399,7 +511,15 @@ impl<'a> Chain<'_, 'a> {
             )
             .await
         {
-            Ok(repaired) => repaired,
+            // What the first reading set aside stays aside when the second gives nothing for it.
+            Ok((repaired, mut read)) => {
+                for (name, given) in values.aside {
+                    if !read.arguments.contains_key(&name) {
+                        read.aside.entry(name).or_insert(given);
+                    }
+                }
+                (repaired, read)
+            }
             Err(_) => (output, values),
         }
     }
@@ -439,6 +559,71 @@ impl<'a> Chain<'_, 'a> {
             .join("\n");
         let Ok((again, read)) = self
             .extract(input, "extract.after_not_given", Some((&output, &note)))
+            .await
+        else {
+            return (output, values);
+        };
+        let mut took = false;
+        for name in &unread {
+            if let Some(given) = read.arguments.get(name) {
+                values.arguments.insert(name.clone(), given.clone());
+                values.not_given.retain(|other| other != name);
+                took = true;
+            }
+        }
+        (if took { again } else { output }, values)
+    }
+
+    /// An answer read as giving the text the assistant asked for no value is read once more,
+    /// told so: the user's own words are the value even when they are also a record's label.
+    /// Asked what a record still needs, what its operation requires is what was asked.
+    async fn asked_read_again(
+        &mut self,
+        input: &ExtractInput<'a>,
+        target: &ActTarget,
+        output: Extraction,
+        mut values: Extracted,
+    ) -> (Extraction, Extracted) {
+        if self.plan.label != "Answer" {
+            return (output, values);
+        }
+        let owing = match (&self.cx.turn.expectation, target) {
+            (Some(Expectation::Obligation { record, .. }), ActTarget::Record { token }) => {
+                record == token
+            }
+            _ => false,
+        };
+        let asked = |argument: &ArgumentSpec| match self.plan.pending {
+            Some(pending) => pending.missing.contains(&argument.name),
+            None => owing && argument.required,
+        };
+        let unread: Vec<String> = input
+            .arguments
+            .iter()
+            .filter(|argument| matches!(argument.shape, ValueShape::Text { .. }) && asked(argument))
+            .map(|argument| argument.name.clone())
+            .filter(|name| {
+                values.not_given.contains(name)
+                    && !values.elsewhere.iter().any(|(other, _)| other == name)
+                    && !self.carried.contains_key(name)
+            })
+            .collect();
+        if unread.is_empty() {
+            return (output, values);
+        }
+        let note = unread
+            .iter()
+            .map(|name| {
+                format!(
+                    "`{name}` is the value the assistant asked for, and this part answers it. The \
+                     user's own words are the value even when they are also a record's name or \
+                     label: give them, unless the part says it does not know or will not say."
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let Ok((again, read)) = self
+            .extract(input, "extract.after_asked", Some((&output, &note)))
             .await
         else {
             return (output, values);
@@ -643,15 +828,15 @@ impl<'a> Chain<'_, 'a> {
             Overall::WrongRecord => *target = self.retarget(target),
             Overall::Confirmed => {}
         }
-        let at_fault = second.at_fault();
-        for name in &at_fault {
-            extracted.arguments.remove(name);
+        for name in second.at_fault() {
+            extracted.arguments.remove(&name);
         }
-        Ok(if at_fault.is_empty() {
+        let asked = self.to_ask(&second);
+        Ok(if asked.is_empty() {
             ActStatus::Ready
         } else {
             ActStatus::NeedsValue {
-                arguments: at_fault,
+                arguments: asked,
                 reason: None,
             }
         })
@@ -805,7 +990,7 @@ impl<'a> Chain<'_, 'a> {
                 .filter(|creation| {
                     let earlier = creation.words.from < plan.words.from
                         || (creation.act.unit == plan.id.unit && creation.act.act < plan.id.act);
-                    creation.workflow == workflow.key && earlier
+                    creation.workflow == workflow.key && earlier && creation.act != plan.id
                 })
                 .map(|creation| Candidate::SameTurn {
                     act: creation.act,
@@ -825,11 +1010,19 @@ impl<'a> Chain<'_, 'a> {
             }
             ActAction::Apply { .. } => self.plan.spec,
         };
+        // A waiting act keeps its record; with none, it creates one or applies to none, as
+        // its operation says.
         if let Some(pending) = self.plan.pending {
-            return Ok(pending
-                .record
-                .clone()
-                .map_or(ActTarget::Nothing, |token| ActTarget::Record { token }));
+            let creates = spec.is_some_and(|spec| {
+                spec.target_policy == TargetPolicy::NewCaseOnly
+                    || (spec.target_policy == TargetPolicy::AllowsNewCase
+                        && self.plan.workflow.new_case.contains(&spec.key))
+            });
+            return Ok(match pending.record.clone() {
+                Some(token) => ActTarget::Record { token },
+                None if creates => ActTarget::New { workflow },
+                None => ActTarget::Nothing,
+            });
         }
         let Some(spec) = spec else {
             return Ok(ActTarget::Nothing);
@@ -987,6 +1180,7 @@ impl<'a> Chain<'_, 'a> {
             transcript: self.cx.settings.transcript,
             note: self.note.clone(),
             occurrence: self.plan.occurrence,
+            corrected: self.corrected_dates(target),
         })
     }
 

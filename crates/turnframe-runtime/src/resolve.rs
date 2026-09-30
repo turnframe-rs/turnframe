@@ -10,7 +10,7 @@
 //! | --- | --- |
 //! | `Record` | through the [`TargetTokenMap`]: unknown is `Unauthorized`, vanished `Missing`, moved `Stale` |
 //! | `New` | only when the operation's [`TargetPolicy`] permits it, minted by a [`CaseIdFactory`] |
-//! | `SameTurn` | the case the earlier act mints, compiled against no state |
+//! | `SameTurn` | the case the earlier act mints, compiled against the state it leaves |
 //! | `Card` | the case of the card on screen |
 //! | `Ambiguous` | a selection among the candidates |
 //! | an origin (§12.4) | [`TargetResolver::resolve_origin`]: exactly the record the surface named |
@@ -155,7 +155,7 @@ impl TargetOutcome {
     }
 
     /// Returns `true` when the case does not exist yet, opened by this act or an
-    /// earlier one, so it compiles against no state.
+    /// earlier one, so it compiles against the state the turn's acts leave, or none.
     #[must_use]
     pub const fn is_unborn(&self) -> bool {
         matches!(

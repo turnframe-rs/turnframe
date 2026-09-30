@@ -38,6 +38,7 @@ considered, Enforcement.
 | [ADR-018](ADR-018-dependent-acts-are-planned-in-their-originating-turn.md) | Dependent acts are planned in their originating turn | I10, I12, I17 |
 | [ADR-019](ADR-019-the-reply-is-written-by-small-tasks-and-reviewed-before-it-is-shown.md) | The reply is written by small tasks and reviewed before it is shown | I6, I16, I17 |
 | [ADR-020](ADR-020-effort-buys-judgment-never-authority.md) | Effort buys judgment, never authority | I9, I18 |
+| [ADR-021](ADR-021-a-conversation-always-moves-forward.md) | A conversation always moves forward | I21, I22 |
 
 ## How the records relate
 

@@ -707,6 +707,14 @@ impl WorkflowDefinition for TravelerWorkflow {
         validate(state, command)
     }
 
+    fn state_after(
+        &self,
+        state: Option<&TravelerState>,
+        command: &TravelerCommand,
+    ) -> Option<TravelerState> {
+        apply(state, command).ok().map(|applied| applied.state)
+    }
+
     fn receipts(
         &self,
         events: &[ReceiptEvent<TravelerEvent>],

@@ -190,6 +190,10 @@ pub fn turn(turn: &AssistantTurn, locale: &Locale) {
             println!("            {}", style::shown(line));
         }
     }
+    // The next steps travel as data beside the reply, as a surface would show them.
+    for offer in &turn.offers {
+        println!("  {}{}", style::tag("next"), style::muted(&offer.words));
+    }
     println!();
 }
 

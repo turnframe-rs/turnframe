@@ -53,7 +53,8 @@ pub(crate) struct Sources<'a> {
 }
 
 /// The operations offered to this turn: every loaded case's, plus what each workflow
-/// offers on a record that does not exist yet.
+/// offers on a record that does not exist yet, and, with none of its records loaded, what
+/// one could do.
 pub(crate) fn operation_catalog(
     definitions: &WorkflowDefinitions,
     cases: &IndexMap<CaseKey, LoadedCase>,
@@ -69,6 +70,15 @@ pub(crate) fn operation_catalog(
         let fresh = CaseRef::new(definition.key(), "", CaseRevision::ZERO);
         for spec in definition.operations(fresh, None)? {
             offered.entry(spec.key.clone()).or_insert(spec);
+        }
+        // With none of its records loaded, what one could do is known too: understanding is
+        // shown it, and a record this turn opens may be asked it.
+        if !cases.keys().any(|key| key.workflow == definition.key()) {
+            for spec in definition.record_operations() {
+                if spec.availability.is_proposable() {
+                    offered.entry(spec.key.clone()).or_insert(spec);
+                }
+            }
         }
     }
     OperationCatalog::new(offered.into_values()).map_err(OrchestratorError::Reduction)
@@ -115,6 +125,13 @@ pub(crate) fn input(sources: &Sources<'_>) -> Result<UnderstandingInput, Orchest
         .with_settings(sources.effort.settings)
         .with_knowledge(sources.knowledge);
     if let Some(previous) = sources.previous {
+        for offer in &previous.offers {
+            if let Some(offered) = still_offered(&turn, sources, offer) {
+                turn = turn.with_offer(offered);
+            }
+        }
+    }
+    if let Some(previous) = sources.previous {
         for subject in &previous.subjects {
             if let Some(token) = sources.resolver.token_map().token_for(&subject.key()) {
                 turn = turn.with_last_subject(token.clone());
@@ -134,6 +151,68 @@ pub(crate) fn input(sources: &Sources<'_>) -> Result<UnderstandingInput, Orchest
         }
     }
     Ok(turn)
+}
+
+/// An offer of the last reply that its record still offers, as the act it runs in this
+/// turn's tokens: the values it knew, and the rest of what its operation takes to ask. An
+/// offer to open a record none of exists runs while its workflow may still open one.
+fn still_offered(
+    turn: &UnderstandingInput,
+    sources: &Sources<'_>,
+    offer: &turnframe_core::response::Offer,
+) -> Option<turnframe_understand::OfferBrief> {
+    let (brief, spec) = turn.operation(&offer.operation)?;
+    let token = if offer.case_ref.case_id.as_str().is_empty() {
+        if !brief.new_case.contains(&offer.operation) {
+            return None;
+        }
+        None
+    } else {
+        let token = sources
+            .resolver
+            .token_map()
+            .token_for(&offer.case_ref.key())?
+            .clone();
+        let (_, record) = turn.record(&token)?;
+        if !record.offers(&offer.operation) {
+            return None;
+        }
+        Some(token)
+    };
+    let given: std::collections::BTreeMap<
+        String,
+        turnframe_core::understanding::UnderstoodArgument,
+    > = offer
+        .arguments
+        .iter()
+        .map(|(name, value)| {
+            let argument = turnframe_core::understanding::UnderstoodArgument {
+                value: ArgumentValue::Json(value.clone()),
+                excerpt: None,
+            };
+            (name.clone(), argument)
+        })
+        .collect();
+    let missing = spec
+        .arguments
+        .iter()
+        .filter(|argument| {
+            !matches!(
+                argument.source,
+                turnframe_core::operation::ArgumentSource::Server { .. }
+            ) && !given.contains_key(&argument.name)
+        })
+        .map(|argument| argument.name.clone())
+        .collect();
+    Some(turnframe_understand::OfferBrief::new(
+        offer.words.clone(),
+        PendingAct {
+            operation: offer.operation.clone(),
+            record: token,
+            given,
+            missing,
+        },
+    ))
 }
 
 /// Acts the last reply left waiting for a record the user named, in this turn's tokens:
@@ -329,6 +408,7 @@ fn workflow_brief(
         }
     }
     let mut subjects: BTreeSet<String> = BTreeSet::new();
+    let mut listed = false;
     for case in sources
         .cases
         .values()
@@ -366,6 +446,20 @@ fn workflow_brief(
             }
         }
         brief = brief.record(record);
+        listed = true;
+    }
+    // With none of its records in view, what one could do is still asked for: shown, it is
+    // told there is none yet rather than left unread.
+    if !listed {
+        for spec in definition.record_operations() {
+            let creates = matches!(
+                spec.target_policy,
+                TargetPolicy::NewCaseOnly | TargetPolicy::AllowsNewCase
+            );
+            if !creates && spec.availability.is_proposable() && offered.insert(spec.key.clone()) {
+                brief = brief.operation(spec);
+            }
+        }
     }
     for subject in subjects {
         brief = brief.subject(subject);

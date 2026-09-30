@@ -207,11 +207,13 @@ impl Session<'_> {
                         .cloned()
                 });
                 // A question about records that framed none is about the records of this
-                // work in view, when the turn reached none: one about what is saved now
-                // is about records whatever topic it was given.
-                let about_records = question.topic == QuestionTopic::RecordState
-                    || (question.topic == QuestionTopic::Knowledge
-                        && basis == AnswerBasis::CurrentCommittedState);
+                // work in view, when the turn reached none: one about what is saved now, or
+                // what can be done with them, is about records whatever topic it was given.
+                let about_records = matches!(
+                    question.topic,
+                    QuestionTopic::RecordState | QuestionTopic::Capabilities
+                ) || (question.topic == QuestionTopic::Knowledge
+                    && basis == AnswerBasis::CurrentCommittedState);
                 let case_refs = match (&framed, question.topic) {
                     (Some(case_ref), _) => vec![case_ref.clone()],
                     (None, _) if about_records && turn_cases.is_empty() => resolver

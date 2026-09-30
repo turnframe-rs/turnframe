@@ -20,7 +20,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
-use turnframe_core::case::CaseKey;
+use turnframe_core::case::{CaseKey, CaseRef};
 use turnframe_core::error::OrchestratorError;
 use turnframe_core::event::{OperationalReceipt, ReceiptEvent};
 use turnframe_core::flow::{ErasedWorkflowView, WorkflowRegistry, WritingStage};
@@ -48,7 +48,7 @@ use crate::config::NarrationConfig;
 use crate::conversation::{RecentMessage, UnavailableWorkflow};
 use crate::narrate::Narrator;
 pub use crate::narrate::outcome::AskCopy;
-use crate::narrate::outcome::{Material, TurnOutcome};
+use crate::narrate::outcome::{Material, Standing, TurnOutcome};
 use crate::narrate::tasks::AcknowledgeInput;
 
 /// Domain separation of the derived replay tokens.
@@ -92,6 +92,8 @@ pub struct CompositionInput<'a> {
     pub ledger: &'a [LedgerReceiptGroup],
     /// Cards on screen after the turn.
     pub interactions: &'a [Interaction],
+    /// Cards earlier turns put on screen that are still open after this one.
+    pub open_cards: &'a [Interaction],
     /// The cases as they now stand.
     pub views: &'a [ErasedWorkflowView],
     /// The cases the turn was about.
@@ -111,7 +113,19 @@ pub struct CompositionInput<'a> {
     /// What each case is called.
     pub case_labels: &'a [CaseLabel],
     /// What each case lets the user do next once it owes nothing, by case.
-    pub next_steps: &'a [(CaseKey, Vec<LocalizedText>)],
+    pub next_steps: &'a [(
+        turnframe_core::case::CaseRef,
+        Vec<turnframe_core::flow::NextStep>,
+    )],
+    /// What the last reply asked, so an ask it repeats says why.
+    pub asked_before: &'a [turnframe_core::response::Expectation],
+    /// Records to offer to open, none existing: the record still to create, the operation
+    /// opening one, and what one is called.
+    pub openings: &'a [(
+        turnframe_core::case::CaseRef,
+        turnframe_core::ids::OperationKey,
+        String,
+    )],
     /// Workflows the turn named.
     pub named_workflows: &'a [WorkflowKey],
     /// Workflows that cannot start, with their reasons.
@@ -165,6 +179,7 @@ impl<'a> CompositionInput<'a> {
             events: &[],
             ledger: &[],
             interactions: &[],
+            open_cards: &[],
             views: &[],
             subjects: &[],
             touched: &[],
@@ -175,6 +190,8 @@ impl<'a> CompositionInput<'a> {
             artifacts_shown: &[],
             case_labels: &[],
             next_steps: &[],
+            asked_before: &[],
+            openings: &[],
             named_workflows: &[],
             unavailable: &[],
             disputes: &[],
@@ -214,6 +231,8 @@ setters! {
     with_ledger: ledger: &'a [LedgerReceiptGroup];
     /// Sets the cards on screen.
     with_interactions: interactions: &'a [Interaction];
+    /// Sets the cards earlier turns left open.
+    with_open_cards: open_cards: &'a [Interaction];
     /// Sets the views.
     with_views: views: &'a [ErasedWorkflowView];
     /// Sets the subjects.
@@ -233,7 +252,11 @@ setters! {
     /// Sets the case labels.
     with_case_labels: case_labels: &'a [CaseLabel];
     /// Sets what each case lets the user do next.
-    with_next_steps: next_steps: &'a [(CaseKey, Vec<LocalizedText>)];
+    with_next_steps: next_steps: &'a [(turnframe_core::case::CaseRef, Vec<turnframe_core::flow::NextStep>)];
+    /// Sets what the last reply asked.
+    with_asked_before: asked_before: &'a [turnframe_core::response::Expectation];
+    /// Sets the records to offer to open.
+    with_openings: openings: &'a [(turnframe_core::case::CaseRef, turnframe_core::ids::OperationKey, String)];
     /// Sets the workflows the turn named.
     with_named_workflows: named_workflows: &'a [WorkflowKey];
     /// Sets the workflows that cannot start.
@@ -529,10 +552,11 @@ impl Composer {
                     reason: blocked.reason.clone(),
                 }),
         );
-        let outcome = Material {
+        let material = Material {
             receipts: &receipts,
             facts: &facts,
             interactions: input.interactions,
+            open_cards: input.open_cards,
             views: input.views,
             touched: input.touched,
             beside: input.beside,
@@ -541,10 +565,12 @@ impl Composer {
             started: input.started,
             contested: input.contested,
             next_steps: input.next_steps,
+            asked_before: input.asked_before,
+            openings: input.openings,
             locale,
             copy: &self.ask_copy,
-        }
-        .outcome();
+        };
+        let mut outcome = material.outcome();
 
         let answers = answers::Answers {
             composer: self,
@@ -552,6 +578,30 @@ impl Composer {
             input: &input,
         };
         let answered = answers.all().await;
+        // A question no fact answered is told where its records stand, else the reply's.
+        let mut unanswered_about: Vec<CaseKey> = Vec::new();
+        for answer in answered
+            .iter()
+            .filter(|answer| answer.status != AnswerStatus::Answered)
+        {
+            let about: Vec<CaseKey> = input
+                .answer_tasks
+                .iter()
+                .find(|task| Some(&task.question_id) == answer.question_id.as_ref())
+                .map(|task| task.case_refs.iter().map(CaseRef::key).collect())
+                .unwrap_or_default();
+            let about = if about.is_empty() {
+                input.touched.to_vec()
+            } else {
+                about
+            };
+            for key in about {
+                if !unanswered_about.contains(&key) {
+                    unanswered_about.push(key);
+                }
+            }
+        }
+        outcome.standing = material.standing(&unanswered_about);
         let notices = self.notices(&input);
         let mut blocks: Vec<ResponseBlock> = Vec::new();
         let mut asked = false;
@@ -622,10 +672,14 @@ impl Composer {
                     parts.push(outcome.not_done.join(" "));
                 }
                 parts.extend(answered.iter().map(|answer| answer.text.clone()));
+                parts.extend(outcome.standing.iter().filter_map(Standing::line));
                 parts.extend(notice_texts);
                 if let Some(ask) = &outcome.ask {
                     asked = true;
                     parts.push(ask.question.clone());
+                    if ask.again && !outcome.next.is_empty() {
+                        parts.push(outcome.next.join(" "));
+                    }
                 } else if !outcome.next.is_empty() {
                     let go_on = self.ask_copy.go_on.resolve(locale);
                     parts.push(format!("{go_on} {}", outcome.next.join(" ")));
@@ -669,6 +723,7 @@ impl Composer {
             replay_token: derive_replay_token(&input.turn.turn_id),
             expectations: Vec::new(),
             done: Vec::new(),
+            offers: outcome.offers.clone(),
         };
         claim_guard::verify(&turn).map_err(|violation| {
             tracing::error!(

@@ -692,7 +692,7 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1882,7 +1882,7 @@ dependencies = [
 
 [[package]]
 name = "mixed-question-and-action"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "serde_json",
@@ -2523,7 +2523,7 @@ dependencies = [
 
 [[package]]
 name = "refund-desk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3610,7 +3610,7 @@ dependencies = [
 
 [[package]]
 name = "travel-desk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3622,7 +3622,7 @@ dependencies = [
 
 [[package]]
 name = "traveler-onboarding"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "serde_json",
@@ -3639,7 +3639,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "turnframe"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3665,7 +3665,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3685,7 +3685,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-eval"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3711,11 +3711,11 @@ dependencies = [
 
 [[package]]
 name = "turnframe-macros"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "turnframe-prompt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "reqwest",
@@ -3731,7 +3731,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-provider"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -3754,7 +3754,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-provider-anthropic"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3780,7 +3780,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-provider-bedrock"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "aws-config",
@@ -3803,7 +3803,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-provider-gemini"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3829,7 +3829,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-provider-ollama"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3850,7 +3850,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-provider-openai"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3876,7 +3876,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-runtime"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3906,7 +3906,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-store"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3921,7 +3921,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-store-postgres"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3939,7 +3939,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-tasks"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -3955,7 +3955,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-telemetry"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "metrics",
@@ -3970,7 +3970,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-test"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3995,7 +3995,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-understand"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",

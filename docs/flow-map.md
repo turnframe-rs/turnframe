@@ -51,7 +51,7 @@ end. Why the projector may never read anything is recorded in
 Understanding is shown the view and nothing it could act on: readable labels for opaque record
 handles, the operations each record offers in its current phase, its open obligations, the card on
 screen and what the assistant last asked. A fixed chain of narrow tasks reads the message
-(`segment`, `coverage`, `route`, `locate`, `extract`, `verify`), each answering one question under
+(`segment`, `coverage`, `take_up`, `route`, `locate`, `extract`, `verify`), each answering one question under
 a strict schema that code checks before the next task runs. Values point at the user's own words,
 and dates and amounts are computed by code from what the model points at.
 

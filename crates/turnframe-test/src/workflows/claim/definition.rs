@@ -659,6 +659,14 @@ impl WorkflowDefinition for ClaimWorkflow {
         validate(state, command)
     }
 
+    fn state_after(
+        &self,
+        state: Option<&ClaimState>,
+        command: &ClaimCommand,
+    ) -> Option<ClaimState> {
+        apply(state, command).ok().map(|applied| applied.state)
+    }
+
     fn receipts(
         &self,
         events: &[ReceiptEvent<ClaimEvent>],

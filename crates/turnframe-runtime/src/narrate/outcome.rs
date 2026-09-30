@@ -37,6 +37,32 @@ pub(crate) struct TurnOutcome {
     /// comes next: no reply leaves the user without a way forward.
     #[serde(skip)]
     pub closing: Option<String>,
+    /// The next steps as the operations they run, recorded on the turn as its offers.
+    #[serde(skip)]
+    pub offers: Vec<turnframe_core::response::Offer>,
+    /// Where the records of questions no fact answered stand.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub standing: Vec<Standing>,
+}
+
+/// Where a record stands: what it holds and what it still needs, as its workflow states them.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub(crate) struct Standing {
+    /// The record, by its label.
+    pub record: String,
+    /// What it holds, each as «field: value».
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub holds: Vec<String>,
+    /// What it still needs.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub needs: Vec<String>,
+}
+
+impl Standing {
+    /// What it holds, as one line code may say; what it needs is the reply's ask.
+    pub fn line(&self) -> Option<String> {
+        (!self.holds.is_empty()).then(|| format!("{}: {}.", self.record, self.holds.join(", ")))
+    }
 }
 
 impl TurnOutcome {
@@ -74,6 +100,9 @@ pub(crate) struct Ask {
     /// Why the value is needed again, when the domain refused the one given.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub because: Option<String>,
+    /// Whether the last reply asked the same of the same record, and nothing refused it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub again: bool,
     /// The question the reply asks when no model writes one, and the model rewords.
     pub question: String,
     /// Whether it is about a record the turn did not reach, so the question names it.
@@ -82,6 +111,30 @@ pub(crate) struct Ask {
     /// What the next turn expects, recorded once the reply is out.
     #[serde(skip)]
     pub expectation: Option<Expectation>,
+    /// Its record and the obligation or operation it waits on, to match the last reply's.
+    #[serde(skip)]
+    pub about: Option<(CaseKey, String)>,
+}
+
+/// What an expectation asked, in the terms of [`Ask::about`].
+fn asked(expectation: &Expectation) -> Option<(CaseKey, String)> {
+    match expectation {
+        Expectation::AwaitingObligation {
+            case_ref,
+            obligation,
+        }
+        | Expectation::AwaitingOperation {
+            case_ref,
+            obligation,
+            ..
+        } => Some((case_ref.key(), obligation.clone())),
+        Expectation::AwaitingValue {
+            act,
+            case_ref: Some(case_ref),
+            ..
+        } => Some((case_ref.key(), act.operation()?.as_str().to_owned())),
+        _ => None,
+    }
 }
 
 /// Copy for the questions code writes when no acknowledgement does.
@@ -101,6 +154,10 @@ pub struct AskCopy {
     pub elsewhere: LocalizedText,
     /// The question a reply ends on when it asks nothing else.
     pub go_on: LocalizedText,
+    /// A question the last reply asked too; `{question}` is the question.
+    pub again: LocalizedText,
+    /// The offer to open a record none of exists; `{noun}` is what one is called.
+    pub open_new: LocalizedText,
 }
 
 impl AskCopy {
@@ -120,6 +177,10 @@ impl AskCopy {
             contested: LocalizedText::new("{what} What should it be instead?"),
             elsewhere: LocalizedText::new("{record}: {question}"),
             go_on: LocalizedText::new("What would you like to do next?"),
+            again: LocalizedText::new(
+                "I still need this to go on. {question} Or tell me what else you would like to do.",
+            ),
+            open_new: LocalizedText::new("Open a new {noun}."),
         }
     }
 }
@@ -138,7 +199,9 @@ crate::copy::server_copy!(
         obligation,
         contested,
         elsewhere,
-        go_on
+        go_on,
+        again,
+        open_new
     ]
 );
 
@@ -153,6 +216,11 @@ const ITALIAN: &[(&str, &str)] = &[
     ("contested", "{what} Come dovrebbe essere, invece?"),
     ("elsewhere", "{record}: {question}"),
     ("go_on", "Cosa vuoi fare adesso?"),
+    (
+        "again",
+        "Mi serve ancora per andare avanti. {question} Oppure dimmi cos'altro vuoi fare.",
+    ),
+    ("open_new", "Aprire un nuovo {noun}."),
 ];
 
 fn fill(template: &LocalizedText, locale: &Locale, pairs: &[(&str, &str)]) -> String {
@@ -168,6 +236,8 @@ pub(crate) struct Material<'a> {
     pub receipts: &'a [OperationalReceipt],
     pub facts: &'a [NarratableFact],
     pub interactions: &'a [Interaction],
+    /// Cards earlier turns left open.
+    pub open_cards: &'a [Interaction],
     pub views: &'a [ErasedWorkflowView],
     /// The cases an act of this turn reached, in act order.
     pub touched: &'a [CaseKey],
@@ -178,7 +248,12 @@ pub(crate) struct Material<'a> {
     pub started: &'a [turnframe_core::ids::WorkflowKey],
     pub contested: &'a [String],
     /// What each case lets the user do next once it owes nothing, by case.
-    pub next_steps: &'a [(CaseKey, Vec<LocalizedText>)],
+    pub next_steps: &'a [(CaseRef, Vec<turnframe_core::flow::NextStep>)],
+    /// What the last reply asked.
+    pub asked_before: &'a [Expectation],
+    /// Records to offer to open, none existing: the record still to create, the operation
+    /// opening one, and what one is called.
+    pub openings: &'a [(CaseRef, turnframe_core::ids::OperationKey, String)],
     pub locale: &'a Locale,
     pub copy: &'a AskCopy,
 }
@@ -201,20 +276,27 @@ impl Material<'_> {
                 what: contested.clone(),
                 because: None,
                 question: fill(&self.copy.contested, self.locale, &[("what", contested)]),
+                again: false,
                 elsewhere: false,
                 expectation: None,
+                about: None,
             });
         }
         let waiting = self.facts.iter().find_map(|fact| match fact {
             NarratableFact::ValueNeeded {
                 case_ref,
+                operation,
                 arguments,
                 reason,
-                ..
-            } => Some((case_ref.clone(), arguments.join(", "), reason.clone())),
+            } => Some((
+                case_ref.clone(),
+                operation.clone(),
+                arguments.join(", "),
+                reason.clone(),
+            )),
             _ => None,
         });
-        if let Some((case_ref, what, because)) = waiting {
+        if let Some((case_ref, operation, what, because)) = waiting {
             let question = match &because {
                 Some(because) => fill(
                     &self.copy.refused_value,
@@ -225,9 +307,11 @@ impl Material<'_> {
             };
             return Some(Ask {
                 record: case_ref.as_ref().and_then(|case_ref| self.label(case_ref)),
+                about: case_ref.map(|case_ref| (case_ref.key(), operation)),
                 what,
                 because,
                 question,
+                again: false,
                 elsewhere: false,
                 // The waiting act is recorded as its own expectation already.
                 expectation: None,
@@ -237,6 +321,7 @@ impl Material<'_> {
         let card_next = self
             .interactions
             .iter()
+            .chain(self.open_cards)
             .any(|card| card.blocking && reached(&card.case_ref))
             || self
                 .views
@@ -289,10 +374,47 @@ impl Material<'_> {
             record,
             question,
             elsewhere,
+            about: Some((view.case_ref.key(), what.clone())),
             expectation: Some(expectation),
             what,
             because: None,
+            again: false,
         })
+    }
+
+    /// Where each of `keys` stands, for the ones in view with anything to say.
+    pub fn standing(&self, keys: &[CaseKey]) -> Vec<Standing> {
+        keys.iter()
+            .filter_map(|key| {
+                let view = self.views.iter().find(|view| view.case_ref.key() == *key)?;
+                let holds: Vec<String> = view
+                    .state
+                    .iter()
+                    .map(|field| {
+                        format!(
+                            "{}: {}",
+                            field.field.replace('_', " "),
+                            spoken(&field.value)
+                        )
+                    })
+                    .collect();
+                let needs: Vec<String> = view
+                    .obligations
+                    .iter()
+                    .map(|obligation| match &obligation.sentence {
+                        Some(sentence) => sentence.resolve(self.locale).to_owned(),
+                        None => obligation_words(&obligation.value),
+                    })
+                    .collect();
+                (!holds.is_empty() || !needs.is_empty()).then(|| Standing {
+                    record: self
+                        .label(&view.case_ref)
+                        .unwrap_or_else(|| view.case_ref.case_id.to_string()),
+                    holds,
+                    needs,
+                })
+            })
+            .collect()
     }
 
     /// Gathers the outcome.
@@ -310,7 +432,13 @@ impl Material<'_> {
             })
             .collect();
         let not_done = self.facts.iter().filter_map(not_done).collect();
-        let card = self.interactions.first().map(|card| {
+        // A card this turn raised, else one an earlier turn left open on a record it reached.
+        let shown = self.interactions.first().or_else(|| {
+            self.open_cards
+                .iter()
+                .find(|card| card.blocking && self.touched.contains(&card.case_ref.key()))
+        });
+        let card = shown.map(|card| {
             let options: Vec<&str> = card
                 .payload
                 .options
@@ -330,25 +458,54 @@ impl Material<'_> {
                 options.join(" / ")
             )
         });
-        let ask = self.ask();
-        let next = if ask.is_none() && card.is_none() {
+        let mut ask = self.ask();
+        // Asked again with no refusal to explain it: the reply says so and offers the rest.
+        if let Some(ask) = ask.as_mut().filter(|ask| ask.because.is_none()) {
+            ask.again = ask.about.as_ref().is_some_and(|about| {
+                self.asked_before
+                    .iter()
+                    .any(|before| asked(before).as_ref() == Some(about))
+            });
+            if ask.again {
+                ask.question = fill(&self.copy.again, locale, &[("question", &ask.question)]);
+            }
+        }
+        let open = ask.as_ref().is_none_or(|ask| ask.again);
+        let offers: Vec<turnframe_core::response::Offer> = if open && card.is_none() {
             self.touched
                 .iter()
                 .find_map(|key| {
                     self.next_steps
                         .iter()
-                        .find(|(case, steps)| case == key && !steps.is_empty())
+                        .find(|(case, steps)| case.key() == *key && !steps.is_empty())
                 })
-                .map(|(_, steps)| {
+                .map(|(case, steps)| {
                     steps
                         .iter()
-                        .map(|step| step.resolve(locale).to_owned())
+                        .map(|step| turnframe_core::response::Offer {
+                            case_ref: case.clone(),
+                            operation: step.operation.clone(),
+                            words: step.words.resolve(locale).to_owned(),
+                            arguments: step.arguments.clone(),
+                        })
                         .collect()
                 })
                 .unwrap_or_default()
         } else {
             Vec::new()
         };
+        let mut offers = offers;
+        if open && card.is_none() {
+            offers.extend(self.openings.iter().map(|(case_ref, operation, noun)| {
+                turnframe_core::response::Offer {
+                    case_ref: case_ref.clone(),
+                    operation: operation.clone(),
+                    words: fill(&self.copy.open_new, locale, &[("noun", noun)]),
+                    arguments: serde_json::Map::new(),
+                }
+            }));
+        }
+        let next: Vec<String> = offers.iter().map(|offer| offer.words.clone()).collect();
         let closing = (ask.is_none() && card.is_none() && next.is_empty())
             .then(|| self.copy.go_on.resolve(locale).to_owned());
         TurnOutcome {
@@ -360,7 +517,18 @@ impl Material<'_> {
             card,
             next,
             closing,
+            offers,
+            standing: Vec::new(),
         }
+    }
+}
+
+/// A value as words: a string as it is, a list as its items.
+fn spoken(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Array(items) => items.iter().map(spoken).collect::<Vec<_>>().join("; "),
+        other => other.to_string(),
     }
 }
 
@@ -428,6 +596,7 @@ mod tests {
             receipts: &[],
             facts,
             interactions: &[],
+            open_cards: &[],
             views: &[],
             touched: &[],
             beside: &[],
@@ -436,9 +605,144 @@ mod tests {
             started: &[],
             contested: &[],
             next_steps: &[],
+            asked_before: &[],
+            openings: &[],
             locale,
             copy,
         }
+    }
+
+    #[test]
+    fn an_ask_the_last_reply_asked_says_so_and_offers_the_next_steps_beside_it() {
+        let case_ref = CaseRef::new("sample", "s-1", CaseRevision(2));
+        let view = ErasedWorkflowView {
+            case_ref: case_ref.clone(),
+            workflow_version: turnframe_core::ids::WorkflowVersion::from("1"),
+            phase: serde_json::json!("collecting"),
+            phase_ownership: turnframe_core::flow::PhaseOwnership::User,
+            obligations: vec![turnframe_core::flow::ErasedObligation {
+                id: turnframe_core::flow::ObligationId("\"a\"".to_owned()),
+                value: serde_json::json!("a"),
+                sentence: Some(LocalizedText::new("What is A?")),
+                act: None,
+            }],
+            blocking_interaction: None,
+            notices: Vec::new(),
+            outcome: None,
+            state: Vec::new(),
+        };
+        let copy = AskCopy::english();
+        let locale = Locale::from("en-GB");
+        let views = [view];
+        let touched = [case_ref.key()];
+        let next_steps = [(
+            case_ref.clone(),
+            vec![turnframe_core::flow::NextStep::new(
+                "sample.add",
+                LocalizedText::new("Add another item."),
+            )],
+        )];
+        let before = [Expectation::AwaitingObligation {
+            case_ref: CaseRef::new("sample", "s-1", CaseRevision(1)),
+            obligation: "What is A?".to_owned(),
+        }];
+        let mut material = material(&[], &copy, &locale);
+        material.views = &views;
+        material.touched = &touched;
+        material.next_steps = &next_steps;
+
+        let first = material.outcome();
+        assert!(!first.ask.as_ref().expect("an ask").again);
+        assert!(first.next.is_empty(), "what is owed comes first");
+
+        material.asked_before = &before;
+        let again = material.outcome();
+        let ask = again.ask.expect("the same ask");
+        assert!(ask.again);
+        assert_eq!(
+            ask.question,
+            "I still need this to go on. What is A? Or tell me what else you would like to do."
+        );
+        assert_eq!(again.next, vec!["Add another item."]);
+    }
+
+    #[test]
+    fn a_record_stands_as_what_it_holds_and_what_it_still_needs() {
+        let case_ref = CaseRef::new("sample", "s-1", CaseRevision(1));
+        let view = ErasedWorkflowView {
+            case_ref: case_ref.clone(),
+            workflow_version: turnframe_core::ids::WorkflowVersion::from("1"),
+            phase: serde_json::json!("collecting"),
+            phase_ownership: turnframe_core::flow::PhaseOwnership::User,
+            obligations: vec![turnframe_core::flow::ErasedObligation {
+                id: turnframe_core::flow::ObligationId("\"b\"".to_owned()),
+                value: serde_json::json!("set_b"),
+                sentence: None,
+                act: None,
+            }],
+            blocking_interaction: None,
+            notices: Vec::new(),
+            outcome: None,
+            state: vec![
+                turnframe_core::flow::StateField::new("the_a", serde_json::json!("X")),
+                turnframe_core::flow::StateField::new("items", serde_json::json!(["one", "two"])),
+            ],
+        };
+        let copy = AskCopy::english();
+        let locale = Locale::from("en-GB");
+        let views = [view];
+        let labels = [CaseLabel {
+            case_ref: case_ref.clone(),
+            label: "S 1".to_owned(),
+        }];
+        let mut material = material(&[], &copy, &locale);
+        material.views = &views;
+        material.labels = &labels;
+        let standing = material.standing(&[case_ref.key()]);
+        assert_eq!(
+            standing,
+            vec![Standing {
+                record: "S 1".to_owned(),
+                holds: vec!["the a: X".to_owned(), "items: one; two".to_owned()],
+                needs: vec!["set b".to_owned()],
+            }]
+        );
+        assert_eq!(
+            standing[0].line().as_deref(),
+            Some("S 1: the a: X, items: one; two.")
+        );
+    }
+
+    #[test]
+    fn a_value_asked_again_after_a_refusal_gives_the_refusal_as_its_reason() {
+        let case_ref = CaseRef::new("trip", "trip-1", CaseRevision(1));
+        let facts = [NarratableFact::ValueNeeded {
+            case_ref: Some(case_ref.clone()),
+            operation: "trip.set_name".to_owned(),
+            arguments: vec!["subject".to_owned()],
+            reason: Some("Too long.".to_owned()),
+        }];
+        let act = crate::resume::card_act(
+            turnframe_core::understanding::ActAction::Apply {
+                operation: "trip.set_name".into(),
+            },
+            turnframe_core::understanding::ActTarget::Card,
+        );
+        let before = [Expectation::AwaitingValue {
+            act: Box::new(act),
+            case_ref: Some(case_ref),
+            missing: vec!["subject".to_owned()],
+        }];
+        let copy = AskCopy::english();
+        let locale = Locale::from("en-GB");
+        let mut material = material(&facts, &copy, &locale);
+        material.asked_before = &before;
+        let ask = material.outcome().ask.expect("an ask");
+        assert!(!ask.again, "the refusal is the reason already given");
+        assert_eq!(
+            ask.question,
+            "Too long. What should the subject be instead?"
+        );
     }
 
     #[test]
@@ -464,10 +768,13 @@ mod tests {
         let locale = Locale::from("en-GB");
         let touched = [CaseRef::new("sample", "s-1", CaseRevision(1)).key()];
         let next_steps = [(
-            touched[0].clone(),
+            CaseRef::new("sample", "s-1", CaseRevision(1)),
             vec![
-                LocalizedText::new("Add another item."),
-                LocalizedText::new("Send it."),
+                turnframe_core::flow::NextStep::new(
+                    "sample.add",
+                    LocalizedText::new("Add another item."),
+                ),
+                turnframe_core::flow::NextStep::new("sample.send", LocalizedText::new("Send it.")),
             ],
         )];
 

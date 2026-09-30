@@ -124,6 +124,7 @@ fn every_task_prompt_stays_within_its_size_budget() {
             transcript: 4,
             note: None,
             occurrence: None,
+            corrected: std::collections::BTreeMap::new(),
         },
         900,
     );
@@ -154,7 +155,7 @@ fn every_task_prompt_stays_within_its_size_budget() {
             note: None,
             continues: None,
         },
-        750,
+        780,
     );
     pinned(
         "question_frame",

@@ -235,6 +235,24 @@ pub struct AssistantTurn {
     /// one and keeps the rest. The next turn reads it, and only that one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub done: Vec<DoneAct>,
+    /// The next steps this reply offered, in order: the next message is read first as
+    /// taking one up, and a surface may show them as choices.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub offers: Vec<Offer>,
+}
+
+/// A step a reply offered: taken up, it runs its operation on its record with the arguments
+/// already known, and asks for the rest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Offer {
+    /// The record it acts on; one still to create has an empty case id.
+    pub case_ref: CaseRef,
+    /// The operation it runs.
+    pub operation: crate::ids::OperationKey,
+    /// The words the reply offered it in, in the turn's language.
+    pub words: String,
+    /// The arguments already known, by name.
+    pub arguments: serde_json::Map<String, serde_json::Value>,
 }
 
 /// An act a turn did, with the values it was given.
@@ -1150,6 +1168,7 @@ mod tests {
             expectations: Vec::new(),
             replay_token: ReplayToken::from("rt"),
             done: Vec::new(),
+            offers: Vec::new(),
         }
     }
 

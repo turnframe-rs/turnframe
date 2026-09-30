@@ -73,6 +73,8 @@ pub mod notice {
     pub const ACT_REFUSED: &str = "turnframe.notice.act_refused";
     /// A value is asked for again, for a reason the server found.
     pub const VALUE_ASKED_AGAIN: &str = "turnframe.notice.value_asked_again";
+    /// A request needed a record of a workflow, and none exists.
+    pub const RECORD_NONE_YET: &str = "turnframe.notice.record_none_yet";
     /// A file the turn carried and the model was not shown.
     pub const ATTACHMENT_NOT_SHOWN: &str = "turnframe.notice.attachment_not_shown";
     /// The card this turn clicked had already been answered.
@@ -170,6 +172,11 @@ pub struct NoticeCopy {
     pub record_not_found_yet: LocalizedText,
     /// The same, when several are called that.
     pub record_not_unique: LocalizedText,
+    /// A request only a record of a workflow can do, when none exists and one can be opened;
+    /// `{workflow}` is what one is called.
+    pub record_none_yet: LocalizedText,
+    /// The same, when none can be opened now.
+    pub record_none: LocalizedText,
     /// Words that produced nothing to act on; `{words}` is replaced by them.
     pub not_understood: LocalizedText,
     /// The whole message could not be read.
@@ -254,6 +261,10 @@ impl NoticeCopy {
                 "There is no {workflow} called «{named}» yet: I can register it, or you can name another.",
             ),
             record_not_unique: LocalizedText::new("More than one {workflow} is called «{named}»."),
+            record_none_yet: LocalizedText::new(
+                "There is no {workflow} yet to do that on: I can open one first.",
+            ),
+            record_none: LocalizedText::new("There is no {workflow} to do that on."),
             not_understood: LocalizedText::new("I did not understand this part: «{words}»."),
             message_unreadable: LocalizedText::new(
                 "I could not make sense of that message, so I did nothing with it. \
@@ -382,6 +393,8 @@ crate::copy::server_copy!(
         record_not_found,
         record_not_found_yet,
         record_not_unique,
+        record_none_yet,
+        record_none,
         not_understood,
         message_unreadable,
         kept_unchanged
@@ -390,6 +403,11 @@ crate::copy::server_copy!(
 
 /// The built-in Italian of [`NoticeCopy`], by field.
 const ITALIAN: &[(&str, &str)] = &[
+    (
+        "record_none_yet",
+        "Per farlo manca ancora un {workflow}: posso aprirne uno io.",
+    ),
+    ("record_none", "Per farlo manca un {workflow}."),
     ("nothing_submitted", "Non è stato inviato nulla."),
     ("nothing_deleted", "Non è stato eliminato nulla."),
     ("draft_only", "È rimasto tutto in bozza."),

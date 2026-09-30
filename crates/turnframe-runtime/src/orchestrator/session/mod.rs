@@ -64,6 +64,8 @@ pub(super) struct Session<'a> {
     resolving_card: Option<InteractionId>,
     /// Notices the runtime writes before reduction: a typed answer the card refused.
     early_notices: Vec<ServerNotice>,
+    /// Workflows a request needed a record of when none existed: the reply offers to open one.
+    none_yet: Vec<turnframe_core::ids::WorkflowKey>,
     /// The effort the turn runs at, resolved once.
     effort: crate::effort::EffortProfile,
 }
@@ -108,6 +110,7 @@ impl<'a> Session<'a> {
             card_act: None,
             resolving_card: None,
             early_notices: Vec::new(),
+            none_yet: Vec::new(),
             effort,
         }
     }

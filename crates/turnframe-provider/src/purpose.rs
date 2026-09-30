@@ -27,6 +27,8 @@ pub enum ModelPurpose {
     Segment,
     /// Find a request or question the units do not cover.
     Coverage,
+    /// Choose which offer of the last reply a unit takes up, if any.
+    TakeUp,
     /// Choose the operation a unit asks for.
     Route,
     /// Choose the record an act aims at.
@@ -138,10 +140,11 @@ pub const READ_ONLY_STRUCTURED_OUTPUT: [StructuredOutputCapability; 4] = [
 
 impl ModelPurpose {
     /// Every purpose, for exhaustive registration and tests.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::OfflineEvaluate,
         Self::Segment,
         Self::Coverage,
+        Self::TakeUp,
         Self::Route,
         Self::Locate,
         Self::Extract,
@@ -163,6 +166,7 @@ impl ModelPurpose {
             self,
             Self::Segment
                 | Self::Coverage
+                | Self::TakeUp
                 | Self::Route
                 | Self::Locate
                 | Self::Extract
@@ -181,6 +185,7 @@ impl ModelPurpose {
             Self::OfflineEvaluate => "offline_evaluate",
             Self::Segment => "segment",
             Self::Coverage => "coverage",
+            Self::TakeUp => "take_up",
             Self::Route => "route",
             Self::Locate => "locate",
             Self::Extract => "extract",
@@ -254,6 +259,7 @@ impl ModelPurpose {
         match self {
             Self::Segment
             | Self::Coverage
+            | Self::TakeUp
             | Self::Route
             | Self::Locate
             | Self::Extract

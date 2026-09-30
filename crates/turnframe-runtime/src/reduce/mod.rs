@@ -12,7 +12,7 @@
 //! | catalog | an unoffered operation, or arguments its schema refuses, refuses the act |
 //! | prerequisites | an act on a record an earlier act opens waits for that act |
 //! | targets | one target per act, through [`TargetResolver`] |
-//! | compilation, validation, policy | per command, the domain first |
+//! | compilation, validation, policy | per command, the domain first; a record the turn opens as its earlier acts leave it |
 //! | batching | by case and atomicity scope; mutations on one case commit together |
 //! | answers | one [`AnswerTask`] per question, an unsafe basis overridden |
 //! | self-check | [`ReductionPlan::validate`] runs before the plan is returned |
@@ -217,6 +217,8 @@ struct Session<'a> {
     minted: Vec<CaseRef>,
     /// The case each opening act opens, for the acts that apply to it.
     opened_by: BTreeMap<ActId, CaseRef>,
+    /// The state the acts so far leave each case this turn opens in, when its workflow tells.
+    unborn: BTreeMap<CaseKey, serde_json::Value>,
     applied: Vec<ConstraintKind>,
     command_count: usize,
 }
@@ -246,6 +248,7 @@ impl<'a> Session<'a> {
             awaiting_confirmation: Vec::new(),
             minted: Vec::new(),
             opened_by: BTreeMap::new(),
+            unborn: BTreeMap::new(),
             applied: Vec::new(),
             command_count: 0,
         }

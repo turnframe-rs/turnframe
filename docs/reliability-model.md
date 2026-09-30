@@ -12,7 +12,7 @@ This document explains the five properties, what "by construction" means for the
 | 2 | Operational claim integrity | Effectively 100%, by construction | EventLedger, receipt composition |
 | 3 | Workflow-state consistency | Effectively 100% for represented states, by construction | FlowProjector / WorkflowDefinition purity, state exploration |
 | 4 | Semantic turn completion | High, but probabilistic | The understanding tasks and their checks, plus mandatory safe degradation |
-| 5 | Conversational quality | Model- and product-dependent | The reply's tasks, reviewed before they are shown, judged offline |
+| 5 | Conversational quality | Model- and product-dependent, with progress guaranteed | The reply's tasks, reviewed before they are shown, judged offline; the progress guarantees of ADR-021 in code; simulated users |
 
 ### 1. Side-effect integrity
 
@@ -56,6 +56,8 @@ A turn's effort level (ADR-020) moves this property and no other. `high` spends 
 ### 5. Conversational quality
 
 Natural language, appropriate tone, clean transitions, no robotic repetition, answers integrated with action receipts without misrepresenting operational state. This is the most model- and product-dependent property, and the architecture explicitly allows it to vary without weakening any of the properties above it.
+
+Its floor is not left to the model (ADR-021). Every reply ends on a way forward: the ask, the card on screen, the next steps, or a question to go on (I21). A reply offers only what the domain accepts now, dry-run before it is offered (I22). A question asked again says why, and one no fact answers is told where its record stands. Conversations as a whole are measured by simulated users, which score dead ends and offers the domain refused as violations: see [evaluation](evaluation.md).
 
 ## What "by construction" means
 

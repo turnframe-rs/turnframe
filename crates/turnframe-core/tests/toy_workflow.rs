@@ -974,6 +974,7 @@ async fn receipts_from_the_definition_satisfy_the_claim_guard() {
         expectations: Vec::new(),
         replay_token: ReplayToken::from("rt"),
         done: Vec::new(),
+        offers: Vec::new(),
     };
     // The whole point of the signature change: a Success receipt rendered by a
     // definition can name the events that back it.

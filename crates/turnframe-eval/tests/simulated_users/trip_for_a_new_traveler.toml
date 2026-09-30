@@ -1,0 +1,27 @@
+id = "trip.for_a_new_traveler"
+name = "A trip is opened for a traveler registered along the way"
+want = "Open a new trip for Nadia Rinaldi, who is not registered yet. Her email is nadia@rinaldi.example and her loyalty number is AZ7654321. Once she is registered and active, add one checked bag at 40 euros, paid by the airline."
+manners = ["terse"]
+max_turns = 12
+
+[setup]
+
+[[reached.case_count]]
+workflow = "trip"
+count = 1
+
+[[reached.workflow_state]]
+workflow = "trip"
+path = "/traveler/display_name"
+equals = "Nadia Rinaldi"
+ignore_case = true
+
+[[reached.workflow_state]]
+workflow = "trip"
+path = "/extras/0/unit_price_cents"
+equals = 4000
+
+[[reached.workflow_state]]
+workflow = "traveler"
+path = "/status"
+equals = "active"

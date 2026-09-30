@@ -30,6 +30,9 @@ pub struct NewExtra {
     pub quantity: u32,
     /// Price of one in cents, never negative.
     pub unit_price_cents: i64,
+    /// Who pays for it, when it is said as it is added.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payer: Option<Payer>,
 }
 
 /// An extra the case adds to the booking: a bag, a seat, a meal, a night.

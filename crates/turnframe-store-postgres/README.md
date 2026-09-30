@@ -6,7 +6,7 @@ persistence contract: seven store traits, one commit store, a migration set, and
 
 ```toml
 [dependencies]
-turnframe-store-postgres = "0.1"
+turnframe-store-postgres = "0.2"
 ```
 
 ## This crate is optional

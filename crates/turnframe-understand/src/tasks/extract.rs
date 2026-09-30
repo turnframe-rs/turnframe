@@ -105,6 +105,8 @@ pub struct ExtractInput<'a> {
     pub note: Option<String>,
     /// Which of the unit's acts of this operation to read, and how many it asks for.
     pub occurrence: Option<(usize, usize)>,
+    /// The dates a correction changes, by argument: one it gives without a year takes theirs.
+    pub corrected: BTreeMap<String, chrono::NaiveDate>,
 }
 
 impl ExtractInput<'_> {
@@ -485,6 +487,7 @@ mod tests {
             transcript: 0,
             note: Some("the value of value is in «rent»".to_owned()),
             occurrence: None,
+            corrected: std::collections::BTreeMap::new(),
         };
         let rendered = format!("{:?}", Extract::new(&turn).render(&input));
         assert!(
@@ -515,6 +518,7 @@ mod tests {
             transcript: 0,
             note: None,
             occurrence: None,
+            corrected: std::collections::BTreeMap::new(),
         };
         let rendered = format!("{:?}", Extract::new(&turn).render(&input));
         assert!(
@@ -550,6 +554,7 @@ mod tests {
             transcript: 0,
             note: None,
             occurrence: None,
+            corrected: std::collections::BTreeMap::new(),
         };
         let rendered = format!("{:?}", Extract::new(&turn).render(&input));
         assert!(

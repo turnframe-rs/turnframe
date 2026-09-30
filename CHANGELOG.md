@@ -5,6 +5,176 @@ All notable changes to Turnframe are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0]
+
+Published: every crate at 0.2.0, on the workspace version again. Every crate depends on
+`turnframe-core`, whose public API changed, so all of them move together.
+
+This release implements ADR-021, a conversation always moves forward: progress is guaranteed by
+code, the assistant's offers are data the next turn reads first, a correction keeps what it does
+not restate, and conversations are evaluated by simulated users.
+
+### Breaking
+
+**`turnframe-core`**
+
+- `WorkflowDefinition::next_steps` returns typed offers and sees the state:
+  `fn next_steps(&self, state: Option<&Self::State>, view: &ViewOf<Self>) -> Vec<NextStep>`,
+  where it was `fn next_steps(&self, view: &ViewOf<Self>) -> Vec<LocalizedText>`. A `NextStep` is
+  an operation, its words and the arguments already known:
+  `NextStep::new(operation, words).with_arguments(json)`, whose arguments are named: a value that
+  is not an object gives none. The erased form takes the case and the state. **Migration:** wrap
+  each sentence as `NextStep::new(<the operation it offers>, sentence)`.
+- `AssistantTurn::offers: Vec<Offer>`: the next steps a reply offered, each with its record,
+  operation, words and arguments by name (an offer to open a record none of exists names one still
+  to create, with an empty case id). A literal that builds an `AssistantTurn` adds
+  `offers: Vec::new()`. It is left out of the serialized turn when empty, so stored turns read as
+  before.
+
+**`turnframe-provider`**
+
+- `ModelPurpose::TakeUp`, the small task that reads a message against the offers of the last
+  reply. `ModelPurpose::ALL` has sixteen purposes.
+
+**`turnframe-understand`**
+
+- `UnderstandingInput::offers: Vec<OfferBrief>` and `with_offer`: the offers of the last reply,
+  each as its words and the act it runs.
+- `ExtractInput::corrected`: the dates a correction changes, by argument. A literal that builds an
+  `ExtractInput` adds `corrected: BTreeMap::new()`.
+
+### Added
+
+**`turnframe-core`**
+
+- `WorkflowDefinition::record_operations`, defaulted to none: every operation a record of the
+  workflow may offer, in any phase, shown to understanding while none of its records is in view.
+- `WorkflowDefinition::state_after`, defaulted to none: the state a valid command leaves, when the
+  workflow can tell without executing it. The erased form is `ErasedWorkflow::state_after`.
+
+**`turnframe-runtime`**
+
+- A next step is offered only when the domain would take it now (I22): the operation is on offer
+  for the record and, when its arguments are complete, the act compiles and every command
+  validates against the state.
+- The offers a reply made are recorded on the turn, and the next message is read against them
+  first: «yes, rebook it» after an offer runs that offer on its record, with nothing routed or
+  located again. A message that takes up no offer is routed as before.
+- A question asked again says it is still needed: when a reply would ask what the last one asked,
+  of the same record, with no refusal to explain it, it says it needs it to go on, offers the
+  record's next steps beside it, and code's own reply says so (`AskCopy::again`).
+- A question no fact answers is told where its record stands: what it holds and what it still
+  needs, from the writer, and what it holds from code's own reply.
+- A request only a record of a workflow can do, when none of its records exists, is told there is
+  none yet and offered to open one (`AskCopy::open_new`); «yes» takes the offer up.
+- The operations understanding is shown are the ones the reduction knows: an act asking what a
+  record could do, with none of its workflow loaded, reaches the domain and is never refused as
+  unknown.
+- A next step whose values are asked when it is taken up is dry-run with its operation's own
+  example values filling them, so a step the domain would refuse whatever the values is not
+  offered.
+- Every next step is to be offered: the writer is told to offer every item, and the review asks
+  whether the reply offers every one of them, by their number.
+- A question that asks for something to be done is answered with where it stands, from the facts
+  and the workflow's guidance, and not declined as unanswerable.
+- A question about what can be done that names no record is answered with what the records in
+  view hold beside what is on offer: «what is the new flight, and what does it cost?» read as
+  what can be done still reaches the quote.
+- A card an earlier turn left open is the way forward of the next reply that reaches its record:
+  the reply points to it instead of ending on the question to go on
+  (`CompositionInput::open_cards`).
+- One message that opens a record and acts on it runs both: an act on a record an earlier act of
+  the message opens is compiled and validated against the state that opening leaves, when the
+  workflow says what its commands leave (`state_after`). Before, it was checked against no state,
+  and a domain that needs the record refused it.
+
+**`turnframe-understand`**
+
+- The take-up task (`tasks::take_up`): which offer of the last reply a part of the message takes
+  up, whether it declines them («no, that's all»), or none, from a closed list. A part that
+  declines is small talk: nothing is reported as not understood.
+- A request routed to create a record, whose words hold the whole label of a record of that
+  workflow already in view («open Trip 1 and name it …»), is routed once more, told the record
+  exists: a second record is not started for it unless the words ask for a new one. On that
+  second reading, readings that find no operation may win the vote (`Route::again`), so a doubt
+  keeps the record that exists.
+- A value in quotes is what the quotes hold even when the mark ending the sentence follows them,
+  and without the sentence's comma or full stop written inside them («“Lisbon offsite,”»).
+- A full stop after the value's last word or address ends the sentence, whatever the copy keeps:
+  «Lisbon offsite.» is «Lisbon offsite», «Trip to Rio.» is «Trip to Rio». Only an initialism
+  keeps its own («S.r.l.»), and so does a word whose stop a comma follows («Inc., thanks»).
+- One record asked for twice in a message, the same creation with the same values read in two
+  parts, is created once.
+- Two acts of one message waiting on the same operation and record, whose values agree and
+  together complete each other, are one act: a request its parts cut in two.
+- A value pointed at in another part's words is that part's only when an act of it uses them
+  for something else; an act that only re-reads the words another act asked for is a second
+  reading, and goes.
+- An answer routed to the act the assistant asked about, whose record is still to create, creates
+  it: it no longer targets nothing, and the record it waited for opens once registered.
+- A record named in a message that also creates the one record of its kind with no name is that
+  record, and gives it the name: it is not looked up, and not registered twice.
+- An answer read as giving the text value the assistant asked for, or one its record still
+  needs, no value is read once more, told the user's own words are the value even when they are
+  also a record's label.
+- An act follows the acts of the message it waits on: one waiting on a record created later in
+  the message is no longer refused as depending on something not done.
+- A creation read twice, the second placed on the first, is the creation once the first reading
+  is dropped: it creates its own record and never waits on itself.
+- A part that asks for no operation but names a listed record by its whole label («open Trip 1»)
+  asks where that record stands: it is answered as a question about that record's state, whatever
+  the question's frame read, never routed again, never reported as not understood, and holds
+  nothing else the message asks of that record. The reply ends on what the record still needs.
+- A request nothing on offer does, about a workflow none of whose records in view offers anything
+  now, asks where they stand: nothing can be done on them, and the reply says why, where it used
+  to report the request not understood. So does such a request whose only reading was found not
+  asked for.
+- An answer to what the last reply asked, read only as acts the user did not ask for, is read
+  again as the act that asked, and kept only when its own words give the value: an answer routed
+  to the previous turn's operation no longer loses the value it gave.
+- Words taken for an answer but read as another operation than the one asked for are checked as
+  a request for it, not as an answer to a question they do not answer.
+- A part whose only reading was found not asked for asks nothing of its record, and no longer
+  holds the other acts on it: «rebook her on the quoted flight; the fare difference is fine»
+  rebooks, where it used to wait.
+- An optional value the check finds the user did not give is left out, and the act goes on
+  without it: «add a checked bag for her» adds the bag and no longer asks who pays.
+- The check of a value copied from the message is told the words of its part the value leaves
+  out, and judges the value shown: «the A is X» read as X is no longer found to take too much.
+  It also reads a question whether an operation can be done («can I O?») as asking for it.
+- A date's year is the user's only when the words it points at say it: a year taken from today's
+  date is none, and the date is placed by its argument's direction.
+- A correction keeps what it does not restate: a date corrected without its year takes the year of
+  the date it changes, done last turn or stated earlier in the message, and is not read against
+  today.
+
+**`turnframe-eval`**
+
+- `simulate`: conversations held by simulated users. A goal in TOML says what the person wants,
+  the manners they talk in, the world before and the state that proves it reached; a model plays
+  the person; code scores each conversation on reached, turns, dead ends, loops, parts not
+  understood, refused acts, offers refused and failed turns. `tests/simulated_users.rs` runs five
+  travel desk goals live on demand, on a day of the year they are written for. See
+  `docs/evaluation.md`.
+
+**`turnframe-test`**
+
+- The trip sample offers another extra always, and the rebooking of the quoted leg once a quote
+  is in, as typed next steps.
+- The trip sample lists what a trip can do (`record_operations`), and its open operation says it
+  is for a trip not listed yet: opening, showing or going to a listed trip asks nothing of it.
+- The trip sample adds an extra with its payer when the message gives one («paid by the
+  airline»): `NewExtra::payer`, `AddExtraArgs::payer` and `TripEvent::ExtraAdded::payer`.
+- The trip, traveler and claim samples say what a command leaves (`state_after`, from their own
+  `apply`), so «open a trip and call it …» opens the trip and names it.
+- The trip sample states where its rebooking stands (`rebooking`, once one is quoted), and tells
+  the answer that a rebooking sent to the airline can be neither changed nor confirmed until the
+  airline replies.
+
+**Examples**
+
+- The console shows the offers beside the reply, as a surface would.
+
 ## [0.1.2]
 
 Published: `turnframe-understand`, `turnframe-runtime`, `turnframe-test` and the `turnframe`

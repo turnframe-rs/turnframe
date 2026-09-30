@@ -363,7 +363,7 @@ pub fn apply(
                 description: extra.description.clone(),
                 quantity: extra.quantity,
                 unit_price_cents: extra.unit_price_cents,
-                payer: None,
+                payer: extra.payer,
             });
             reopen_for_edit(&mut next);
             TripEvent::ExtraAdded {
@@ -371,6 +371,7 @@ pub fn apply(
                 description: extra.description.clone(),
                 quantity: extra.quantity,
                 unit_price_cents: extra.unit_price_cents,
+                payer: extra.payer,
             }
         }
         TripCommand::AssignPayer { extra_id, payer } => {

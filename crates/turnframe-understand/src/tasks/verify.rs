@@ -178,6 +178,47 @@ fn copied_from_this_message(turn: &UnderstandingInput, argument: &UnderstoodArgu
             .is_ok_and(|said| bare(said) == bare(text))
 }
 
+/// The words of `part` no argument of the act takes, quoted run by run, when `argument` takes
+/// words of this message inside the part and leaves some of them out.
+fn left_out(
+    turn: &UnderstandingInput,
+    arguments: &BTreeMap<String, UnderstoodArgument>,
+    argument: &UnderstoodArgument,
+    part: Span,
+) -> Option<String> {
+    let inside = |argument: &UnderstoodArgument| {
+        argument.excerpt.filter(|excerpt| {
+            excerpt.message == MessageRef::Current
+                && excerpt.words.first >= part.from
+                && excerpt.words.last <= part.to
+        })
+    };
+    inside(argument)?;
+    let taken: Vec<(usize, usize)> = arguments
+        .values()
+        .filter_map(inside)
+        .map(|excerpt| (excerpt.words.first, excerpt.words.last))
+        .collect();
+    let free = |word: usize| {
+        !taken
+            .iter()
+            .any(|(first, last)| (*first..=*last).contains(&word))
+    };
+    let mut runs: Vec<(usize, usize)> = Vec::new();
+    for word in (part.from..=part.to).filter(|word| free(*word)) {
+        match runs.last_mut() {
+            Some((_, last)) if *last + 1 == word => *last = word,
+            _ => runs.push((word, word)),
+        }
+    }
+    let quoted: Vec<String> = runs
+        .into_iter()
+        .filter_map(|(from, to)| turn.message.slice(Span::new(from, to)).ok())
+        .map(render::quoted)
+        .collect();
+    (!quoted.is_empty()).then(|| quoted.join(" and "))
+}
+
 impl<'a> ModelTask for Verify<'a> {
     type Input = VerifyInput<'a>;
     type Output = Verdict;
@@ -233,13 +274,24 @@ impl<'a> ModelTask for Verify<'a> {
                     .cloned()
                     .unwrap_or_else(|| format!("{record:?}"))
             });
+            // The words of its part a copied value leaves out are said, so they are not
+            // taken for part of it.
+            let copied_here = copied_from_this_message(turn, argument);
+            let shown = match left_out(turn, input.arguments, argument, input.words)
+                .filter(|_| copied_here)
+            {
+                Some(left) => match shown.strip_suffix(')') {
+                    Some(open) => format!("{open}; {left} of its part is not in it)"),
+                    None => format!("{shown} ({left} of its part is not in it)"),
+                },
+                None => shown,
+            };
             let _ = write!(understood, "\n- {name} ({label}): {shown}");
             if let Some(meaning) = input.meanings.get(name) {
                 let _ = write!(understood, "\n  {meaning}");
             }
             // Only a copy from this message can be words pointing at an earlier value; a value
             // taken from the earlier message is what they point at.
-            let copied_here = copied_from_this_message(turn, argument);
             if copied_here && turn.transcript.iter().any(|m| m.speaker == Speaker::User) {
                 understood.push_str(
                     "\n  Copied from this message: words that only refer back to a value said \
@@ -362,6 +414,82 @@ fn ordinal(number: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_words_of_its_part_a_copied_value_leaves_out_are_said() {
+        // [0]the [1]A [2]is [3]X [4]Y
+        let turn = UnderstandingInput::new("the A is X Y", "en-GB", chrono::NaiveDate::MIN);
+        let value = UnderstoodArgument {
+            value: ArgumentValue::Json(Value::from("X Y")),
+            excerpt: Some(turnframe_core::understanding::Excerpt {
+                message: MessageRef::Current,
+                words: turn
+                    .message
+                    .range(Span::new(3, 4))
+                    .unwrap_or_else(|_| unreachable!()),
+            }),
+        };
+        let arguments = BTreeMap::from([("value".to_owned(), value)]);
+        let input = VerifyInput {
+            label: "Answer",
+            words: Span::new(0, 4),
+            meaning: "Set A.".to_owned(),
+            record: "R 1".to_owned(),
+            arguments: &arguments,
+            labels: BTreeMap::new(),
+            record_labels: BTreeMap::new(),
+            meanings: BTreeMap::new(),
+            occurrence: None,
+            note: None,
+            continues: None,
+        };
+        let rendered = format!("{:?}", Verify::new(&turn).render(&input));
+        assert!(
+            rendered.contains("«the A is» of its part is not in it"),
+            "{rendered}"
+        );
+    }
+
+    #[test]
+    fn words_another_argument_takes_are_not_said_to_be_left_out() {
+        // [0]add [1]3 [2]hotel [3]nights
+        let turn = UnderstandingInput::new("add 3 hotel nights", "en-GB", chrono::NaiveDate::MIN);
+        let taken = |from: usize, to: usize, value: Value| UnderstoodArgument {
+            value: ArgumentValue::Json(value),
+            excerpt: Some(turnframe_core::understanding::Excerpt {
+                message: MessageRef::Current,
+                words: turn
+                    .message
+                    .range(Span::new(from, to))
+                    .unwrap_or_else(|_| unreachable!()),
+            }),
+        };
+        let arguments = BTreeMap::from([
+            (
+                "description".to_owned(),
+                taken(2, 3, Value::from("hotel nights")),
+            ),
+            ("quantity".to_owned(), taken(1, 1, Value::from(3))),
+        ]);
+        let input = VerifyInput {
+            label: "Request",
+            words: Span::new(0, 3),
+            meaning: "Add an extra.".to_owned(),
+            record: "R 1".to_owned(),
+            arguments: &arguments,
+            labels: BTreeMap::new(),
+            record_labels: BTreeMap::new(),
+            meanings: BTreeMap::new(),
+            occurrence: None,
+            note: None,
+            continues: None,
+        };
+        let rendered = format!("{:?}", Verify::new(&turn).render(&input));
+        assert!(
+            rendered.contains("«add» of its part is not in it"),
+            "{rendered}"
+        );
+    }
 
     #[test]
     fn a_note_from_the_whole_turn_check_is_shown() {

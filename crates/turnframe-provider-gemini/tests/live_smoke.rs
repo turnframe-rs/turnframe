@@ -518,6 +518,7 @@ mod understanding {
                     transcript: 4,
                     note: None,
                     occurrence: None,
+                    corrected: std::collections::BTreeMap::new(),
                 },
             ));
         }

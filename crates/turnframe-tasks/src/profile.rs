@@ -102,10 +102,12 @@ impl TaskProfile {
                 repairs: 0,
                 ..base
             },
-            TaskKind::Route | TaskKind::Locate | TaskKind::QuestionFrame => Self {
-                max_output_tokens: Some(150),
-                ..base
-            },
+            TaskKind::TakeUp | TaskKind::Route | TaskKind::Locate | TaskKind::QuestionFrame => {
+                Self {
+                    max_output_tokens: Some(150),
+                    ..base
+                }
+            }
             TaskKind::Extract => Self {
                 max_output_tokens: Some(600),
                 ..base

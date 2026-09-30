@@ -14,7 +14,7 @@ mod units;
 use std::collections::BTreeMap;
 
 use futures::future::join_all;
-use turnframe_core::ids::{OperationKey, WorkflowKey};
+use turnframe_core::ids::{OperationKey, TargetToken, WorkflowKey};
 use turnframe_core::plan::TargetPolicy;
 use turnframe_core::understanding::{
     ActAction, ActId, ActStatus, NotUnderstood, NotUnderstoodReason, QuestionTopic, Superseded,
@@ -24,12 +24,13 @@ use turnframe_tasks::{TaskCall, TaskEngine, TaskId, TaskOutcome, TaskScope};
 
 use crate::assemble;
 use crate::check::{ActChecker, NoChecks};
-use crate::input::{Expectation, PendingAct, UnderstandingInput, WorkflowBrief};
+use crate::input::{Expectation, PendingAct, RecordBrief, UnderstandingInput, WorkflowBrief};
 use crate::progress::{Routing, Step, StepSink, UnitSummary};
 use crate::tasks::coverage::{Coverage, Found};
 use crate::tasks::question_frame::{QuestionFrame, QuestionInput};
 use crate::tasks::route::{NONE, Route, RouteInput, START};
 use crate::tasks::segment::{Segment, Segmentation, SegmentedUnit};
+use crate::tasks::take_up::{DECLINES, TakeUp, TakeUpInput, offer_at};
 
 pub(crate) use chain::Chained;
 use chain::{Creation, Planned};
@@ -174,8 +175,12 @@ enum Routed {
         workflow: WorkflowKey,
         task: TaskId,
         depth: u8,
+        /// The offer of the last reply this act takes up, by its position.
+        taken: Option<usize>,
     },
     Nothing(NotUnderstoodReason),
+    /// The part says no to what the last reply offered: nothing to do, and nothing misread.
+    Declined,
 }
 
 /// The units of a message, where each routes, and its framed questions.
@@ -210,6 +215,10 @@ pub(crate) struct Context<'a> {
     pub creations: Vec<Creation>,
     /// The words of every unit of the message.
     pub units: Vec<crate::words::Span>,
+    /// Values each act set aside as another part's, by act.
+    pub aside: std::sync::Mutex<
+        BTreeMap<ActId, BTreeMap<String, turnframe_core::understanding::UnderstoodArgument>>,
+    >,
 }
 
 fn summary(turn: &UnderstandingInput, unit: &Seg) -> UnitSummary {
@@ -309,6 +318,7 @@ impl Understander {
         if let Some((first, units::Retry::Disputed { dispute: false, .. })) = &lost {
             small_talk_stands(first, &mut units, &mut routes);
         }
+        declining_is_talk(&mut units, &mut routes);
         let mut planning = plan(turn, &units, &routes);
         for item in &planning.not_understood {
             steps.step(Step::NotUnderstood {
@@ -325,6 +335,7 @@ impl Understander {
             steps,
             creations: creations(&planning.planned),
             units: units.iter().map(|unit| unit.span).collect(),
+            aside: std::sync::Mutex::default(),
         };
         let mut chained = join_all(
             planning
@@ -354,13 +365,38 @@ impl Understander {
         }
         joins_its_request(&units, &mut chained);
         pieces_of_one_value(&units, &mut chained);
+        unclaimed_values(&cx, &mut chained);
         once_each(&mut chained);
         given_not_created(turn, &mut chained);
         not_asked_quietly(&units, &mut chained);
         named_as_created(turn, &mut chained);
         the_one_created(&cx.creations, &mut chained);
+        // Two acts the steps above made the same are one act.
+        once_each(&mut chained);
+        halves_of_one_request(&mut chained);
         copies_keep_to_their_words(turn, &mut chained);
+        second_readings_go(&mut chained);
         self.respected(&cx, &units, &mut chained).await;
+        // A request whose every reading was found not asked for, about records that can do
+        // nothing now, asks where they stand.
+        let refused: Vec<UnitId> = units
+            .iter()
+            .map(|unit| unit.id)
+            .filter(|id| every_reading_refused(&chained, *id))
+            .collect();
+        let asked = self
+            .ask_standing(
+                scope,
+                turn,
+                &mut units,
+                &refused,
+                idle_standing,
+                &mut questions,
+            )
+            .await;
+        chained.retain(|outcome| {
+            !matches!(outcome, Chained::NotUnderstood { unit, .. } if asked.contains(unit))
+        });
         for outcome in &chained {
             if let Chained::NotUnderstood { unit, reason, .. } = outcome {
                 steps.step(Step::NotUnderstood {
@@ -572,6 +608,8 @@ impl Understander {
                         .cloned()
                         .collect();
                     if late.is_empty() {
+                        self.mentions(scope, turn, &mut units, &mut routes, &mut questions)
+                            .await;
                         return Ok((units, routes, questions));
                     }
                     steps.step(Step::Covered {
@@ -585,7 +623,90 @@ impl Understander {
                 }
             }
         }
+        self.mentions(scope, turn, &mut units, &mut routes, &mut questions)
+            .await;
         Ok((units, routes, questions))
+    }
+
+    /// Parts that ask for no operation ask where a record stands when [`standing_asked`] finds
+    /// one: they are read as that question.
+    async fn mentions(
+        &self,
+        scope: &TaskScope,
+        turn: &UnderstandingInput,
+        units: &mut [Seg],
+        routes: &mut BTreeMap<UnitId, Vec<Routed>>,
+        questions: &mut BTreeMap<UnitId, UnderstoodQuestion>,
+    ) {
+        let unrouted: Vec<UnitId> = units
+            .iter()
+            .filter(|unit| {
+                matches!(
+                    routes.get(&unit.id).map(Vec::as_slice),
+                    Some([Routed::Nothing(NotUnderstoodReason::NoOperation)])
+                )
+            })
+            .map(|unit| unit.id)
+            .collect();
+        for id in self
+            .ask_standing(scope, turn, units, &unrouted, standing_asked, questions)
+            .await
+        {
+            routes.remove(&id);
+        }
+    }
+
+    /// Reads each request of `ids` that asks where a record stands, as `found` says, as that
+    /// question, framed only: about the record's state, and about the one record it names,
+    /// whatever the frame read. Returns the parts read so.
+    async fn ask_standing(
+        &self,
+        scope: &TaskScope,
+        turn: &UnderstandingInput,
+        units: &mut [Seg],
+        ids: &[UnitId],
+        found: for<'t> fn(&'t UnderstandingInput, &Seg) -> Option<Standing<'t>>,
+        questions: &mut BTreeMap<UnitId, UnderstoodQuestion>,
+    ) -> Vec<UnitId> {
+        let mut asked: Vec<Seg> = Vec::new();
+        let mut named: BTreeMap<UnitId, TargetToken> = BTreeMap::new();
+        for unit in units.iter_mut() {
+            if unit.kind() != UnitKind::Request || !ids.contains(&unit.id) {
+                continue;
+            }
+            let Some((workflow, record)) = found(turn, unit) else {
+                continue;
+            };
+            if let Some(record) = record {
+                named.insert(unit.id, record.token.clone());
+            }
+            unit.unit = SegmentedUnit::Question {
+                words: unit.span,
+                workflow: workflow.key.to_string(),
+                basis: turnframe_core::plan::AnswerBasis::CurrentCommittedState,
+                continues_previous: false,
+            };
+            asked.push(unit.clone());
+        }
+        // Framed only: routed already, a part asking whether it can be done is not routed again.
+        let mut framed: BTreeMap<UnitId, UnderstoodQuestion> = join_all(
+            asked
+                .iter()
+                .map(|unit| async move { (unit.id, self.frame(scope, turn, unit).await.0) }),
+        )
+        .await
+        .into_iter()
+        .collect();
+        for question in framed.values_mut() {
+            question.topic = QuestionTopic::RecordState;
+        }
+        for (id, token) in named {
+            if let Some(question) = framed.get_mut(&id) {
+                question.record = Some(token);
+            }
+        }
+        questions.extend(framed);
+        asked.iter().map(|unit| unit.id).collect()
     }
 
     async fn routes_and_frames(
@@ -669,6 +790,11 @@ impl Understander {
         // guess, and a value given is routed like a request, the question it answers in
         // view, so words asking for something else are that request.
         let workflows: Vec<&WorkflowBrief> = turn.workflows.iter().collect();
+        if again.is_none()
+            && let Some(taken) = self.taken_up(scope, turn, unit).await
+        {
+            return vec![taken];
+        }
         let input = RouteInput {
             label: label_of(unit.kind()),
             words: unit.span,
@@ -680,10 +806,10 @@ impl Understander {
         if let [_none] = input.choices().as_slice() {
             return vec![Routed::Nothing(NotUnderstoodReason::NoOperation)];
         }
-        let name = if input.note.is_some() {
-            "route.again"
+        let (name, task) = if input.note.is_some() {
+            ("route.again", Route::again(turn))
         } else {
-            "route"
+            ("route", Route::new(turn))
         };
         let id = unit.task().child(name);
         let call = TaskCall {
@@ -691,19 +817,29 @@ impl Understander {
             parent: Some(&unit.parent),
             depth: unit.depth.saturating_add(1),
         };
-        match self
-            .engine
-            .run(scope, call, &Route::new(turn), &input)
-            .await
-        {
+        match self.engine.run(scope, call, &task, &input).await {
             TaskOutcome::Accepted { output, depth } => {
                 // A new record comes first, so what the request asks of it can follow.
                 let mut chosen = output.operations;
                 chosen.sort_by_key(|choice| !choice.starts_with(START));
-                chosen
+                let routes: Vec<Routed> = chosen
                     .iter()
                     .map(|choice| routed(turn, choice, id.clone(), depth))
-                    .collect()
+                    .collect();
+                // Creating a record the words name by the label of one in view is read again.
+                match named_in_view(turn, unit, &routes) {
+                    Some(label) if input.note.is_none() => {
+                        let note = format!(
+                            "The part names «{label}», a record already in view by its whole \
+                             label. An operation that creates a new record is for one that does \
+                             not exist yet: choose the operations the part asks of that record, \
+                             unless its words ask for a new one."
+                        );
+                        Box::pin(self.route(scope, turn, unit, input.others.clone(), Some(note)))
+                            .await
+                    }
+                    _ => routes,
+                }
             }
             TaskOutcome::Disagreed { .. } => vec![Routed::Nothing(NotUnderstoodReason::Unclear)],
             TaskOutcome::Failed { failure, .. } => {
@@ -713,6 +849,55 @@ impl Understander {
                 })]
             }
         }
+    }
+
+    /// The offer of the last reply `unit` takes up, as its route: read first, and only for a
+    /// part that asks for something or answers, when the last reply offered anything. A part
+    /// withdrawing nothing earlier in the message may decline them, and takes up none.
+    async fn taken_up(
+        &self,
+        scope: &TaskScope,
+        turn: &UnderstandingInput,
+        unit: &Seg,
+    ) -> Option<Routed> {
+        let withdraws = unit.kind() == UnitKind::Cancel;
+        let reads = withdraws || matches!(unit.kind(), UnitKind::Request | UnitKind::ProvidesValue);
+        if turn.offers.is_empty() || !reads {
+            return None;
+        }
+        let input = TakeUpInput {
+            label: label_of(unit.kind()),
+            words: unit.span,
+        };
+        let id = unit.task().child("take_up");
+        let call = TaskCall {
+            id: &id,
+            parent: Some(&unit.parent),
+            depth: unit.depth.saturating_add(1),
+        };
+        let TaskOutcome::Accepted { output, depth } = self
+            .engine
+            .run(scope, call, &TakeUp::new(turn), &input)
+            .await
+        else {
+            return None;
+        };
+        if output.offer == DECLINES {
+            return Some(Routed::Declined);
+        }
+        if withdraws {
+            return None;
+        }
+        let at = offer_at(turn, &output.offer)?;
+        let operation = turn.offers.get(at)?.act.operation.clone();
+        let (workflow, _) = turn.operation(&operation)?;
+        Some(Routed::Act {
+            workflow: workflow.key.clone(),
+            action: ActAction::Apply { operation },
+            task: id,
+            depth,
+            taken: Some(at),
+        })
     }
 
     async fn frame(
@@ -798,10 +983,148 @@ fn report_routes(steps: &dyn StepSink, unit: UnitId, routed: &[Routed]) {
                 workflow: workflow.clone(),
             },
             Routed::Nothing(NotUnderstoodReason::NoOperation) => Routing::Nothing,
-            Routed::Nothing(_) => continue,
+            Routed::Nothing(_) | Routed::Declined => continue,
         };
         steps.step(Step::Routed { unit, to });
     }
+}
+
+/// `text` as its words, lowercase, each between spaces: a label is held whole when its words
+/// are.
+/// Whether every reading of `unit` ended as an act the user did not ask for.
+fn every_reading_refused(chained: &[Chained], unit: UnitId) -> bool {
+    let mut readings = chained.iter().filter(|outcome| match outcome {
+        Chained::Act(act) => act.id.unit == unit,
+        Chained::NotUnderstood { unit: of, .. } => *of == unit,
+        Chained::Nothing => false,
+    });
+    let first = readings.next();
+    first.is_some()
+        && first.into_iter().chain(readings).all(|outcome| {
+            matches!(
+                outcome,
+                Chained::NotUnderstood {
+                    reason: NotUnderstoodReason::NotRequested,
+                    ..
+                }
+            )
+        })
+}
+
+/// The workflow, and the one record, a request asking for nothing that can be done asks the
+/// standing of: a listed record its words name by the whole label, or a workflow none of whose
+/// records in view offers anything now.
+fn standing_asked<'t>(turn: &'t UnderstandingInput, unit: &Seg) -> Option<Standing<'t>> {
+    let said = spoken(turn.message.slice(unit.span).ok()?);
+    match records_named(turn, &said).as_slice() {
+        [(workflow, record)] => Some((*workflow, Some(*record))),
+        [(workflow, _), ..] => Some((*workflow, None)),
+        [] => idle_standing(turn, unit),
+    }
+}
+
+/// A workflow and its one record whose standing a part asks.
+type Standing<'t> = (&'t WorkflowBrief, Option<&'t RecordBrief>);
+
+/// The workflow `unit` is about, with its one record, when none of its records in view offers
+/// anything now.
+fn idle_standing<'t>(turn: &'t UnderstandingInput, unit: &Seg) -> Option<Standing<'t>> {
+    let workflow = idle_workflow(turn, unit)?;
+    let only = workflow
+        .records
+        .first()
+        .filter(|_| workflow.records.len() == 1);
+    Some((workflow, only))
+}
+
+/// The workflow `unit` is about, when it has records in view and none of them offers anything
+/// now: nothing asked of it can be done.
+fn idle_workflow<'t>(turn: &'t UnderstandingInput, unit: &Seg) -> Option<&'t WorkflowBrief> {
+    let key = unit.unit.workflow()?;
+    let workflow = turn
+        .workflows
+        .iter()
+        .find(|workflow| workflow.key.as_str() == key)?;
+    let idle = !workflow.records.is_empty()
+        && workflow
+            .records
+            .iter()
+            .all(|record| record.operations.is_empty());
+    idle.then_some(workflow)
+}
+
+/// The listed records whose whole label `said` holds, leaving out a label only held inside a
+/// longer one it holds («A» inside «A B»).
+fn records_named<'t>(
+    turn: &'t UnderstandingInput,
+    said: &str,
+) -> Vec<(&'t WorkflowBrief, &'t RecordBrief)> {
+    let held: Vec<_> = turn
+        .workflows
+        .iter()
+        .flat_map(|workflow| {
+            workflow
+                .records
+                .iter()
+                .map(move |record| (workflow, record))
+        })
+        .filter(|(_, record)| {
+            let label = spoken(&record.label);
+            label.trim() != "" && said.contains(&label)
+        })
+        .collect();
+    held.iter()
+        .filter(|(_, record)| {
+            let label = spoken(&record.label);
+            !held.iter().any(|(_, other)| {
+                let longer = spoken(&other.label);
+                longer.len() > label.len() && longer.contains(&label)
+            })
+        })
+        .copied()
+        .collect()
+}
+
+fn spoken(text: &str) -> String {
+    let words: Vec<String> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    format!(" {} ", words.join(" "))
+}
+
+/// The label of a record in view that `unit`'s words hold whole, of a workflow one of `routes`
+/// creates a record of.
+fn named_in_view<'t>(
+    turn: &'t UnderstandingInput,
+    unit: &Seg,
+    routes: &[Routed],
+) -> Option<&'t str> {
+    let said = spoken(turn.message.slice(unit.span).ok()?);
+    routes.iter().find_map(|route| {
+        let Routed::Act {
+            action, workflow, ..
+        } = route
+        else {
+            return None;
+        };
+        let brief = turn.workflow(workflow)?;
+        let creates = match action {
+            ActAction::Start { .. } => true,
+            ActAction::Apply { operation } => brief
+                .spec(operation)
+                .is_some_and(|spec| spec.target_policy == TargetPolicy::NewCaseOnly),
+        };
+        if !creates {
+            return None;
+        }
+        brief
+            .records
+            .iter()
+            .map(|record| record.label.as_str())
+            .find(|label| spoken(label).trim() != "" && said.contains(&spoken(label)))
+    })
 }
 
 fn routed(turn: &UnderstandingInput, choice: &str, task: TaskId, depth: u8) -> Routed {
@@ -817,6 +1140,7 @@ fn routed(turn: &UnderstandingInput, choice: &str, task: TaskId, depth: u8) -> R
             workflow,
             task,
             depth,
+            taken: None,
         };
     }
     let operation = OperationKey::from(choice);
@@ -826,6 +1150,7 @@ fn routed(turn: &UnderstandingInput, choice: &str, task: TaskId, depth: u8) -> R
             action: ActAction::Apply { operation },
             task,
             depth,
+            taken: None,
         },
         None => Routed::Nothing(NotUnderstoodReason::NoOperation),
     }
@@ -897,17 +1222,19 @@ fn plan<'a>(
             (same.len() > 1).then_some((position + 1, same.len()))
         };
         for (number, route) in (1..).zip(routed) {
-            let (action, workflow, task, depth) = match route {
+            let (action, workflow, task, depth, taken) = match route {
                 Routed::Act {
                     action,
                     workflow,
                     task,
                     depth,
-                } => (action, workflow, task, *depth),
+                    taken,
+                } => (action, workflow, task, *depth, *taken),
                 Routed::Nothing(reason) => {
                     planning.not_understood.push(not_understood(reason.clone()));
                     continue;
                 }
+                Routed::Declined => continue,
             };
             let Some(brief) = turn.workflow(workflow) else {
                 planning
@@ -919,7 +1246,11 @@ fn plan<'a>(
                 ActAction::Apply { operation } => brief.spec(operation),
                 ActAction::Start { .. } => None,
             };
+            // An offer taken up is its act, as an answer to what was asked is.
             let pending = match (&turn.expectation, unit.kind(), action) {
+                _ if taken.is_some() => taken
+                    .and_then(|at| turn.offers.get(at))
+                    .map(|offer| &offer.act),
                 (
                     Some(Expectation::Values(pending)),
                     UnitKind::ProvidesValue,
@@ -935,10 +1266,17 @@ fn plan<'a>(
                     .collect(),
                 _ => Vec::new(),
             };
+            // A value read as another operation than the one asked for asks for that one.
+            let label = match (&turn.expectation, unit.kind()) {
+                (Some(Expectation::Values(_)), UnitKind::ProvidesValue) if pending.is_none() => {
+                    label_of(UnitKind::Request)
+                }
+                _ => label_of(unit.kind()),
+            };
             planning.planned.push(Planned {
                 id: ActId::new(unit.id, number),
                 unit: unit.id,
-                label: label_of(unit.kind()),
+                label,
                 words: unit.span,
                 range: unit.range,
                 action: action.clone(),
@@ -1148,6 +1486,207 @@ fn pieces_of_one_value(units: &[Seg], chained: &mut [Chained]) {
     }
 }
 
+/// A value an act set aside as another part's is its own again when no other act points at
+/// those words, or when the acts that do read nothing else: they are second readings of the
+/// words this act asked for, and go.
+fn unclaimed_values(cx: &Context<'_>, chained: &mut Vec<Chained>) {
+    use turnframe_core::understanding::{ArgumentValue, Excerpt, UnderstoodAct};
+    let aside = std::mem::take(
+        &mut *cx
+            .aside
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    );
+    if aside.is_empty() {
+        return;
+    }
+    let overlaps = |a: &Excerpt, b: &Excerpt| {
+        a.message == b.message && a.words.first <= b.words.last && b.words.first <= a.words.last
+    };
+    let acts: Vec<UnderstoodAct> = chained
+        .iter()
+        .filter_map(|outcome| match outcome {
+            Chained::Act(act) => Some(act.clone()),
+            _ => None,
+        })
+        .collect();
+    let waited_on = |id: ActId| acts.iter().any(|act| act.depends_on.contains(&id));
+    let mut dropped: Vec<ActId> = Vec::new();
+    for outcome in chained.iter_mut() {
+        let Chained::Act(act) = outcome else {
+            continue;
+        };
+        let Some(set_aside) = aside.get(&act.id) else {
+            continue;
+        };
+        let mut missing = match &act.status {
+            ActStatus::Ready => Vec::new(),
+            ActStatus::NeedsValue {
+                arguments,
+                reason: None,
+            } => arguments.clone(),
+            _ => continue,
+        };
+        let wanted: Vec<Excerpt> = set_aside
+            .values()
+            .filter_map(|given| given.excerpt)
+            .collect();
+        for (name, given) in set_aside {
+            let Some(excerpt) = given.excerpt else {
+                continue;
+            };
+            let readers: Vec<&UnderstoodAct> = acts
+                .iter()
+                .filter(|other| {
+                    other.id != act.id
+                        && other
+                            .arguments
+                            .values()
+                            .filter_map(|theirs| theirs.excerpt.as_ref())
+                            .any(|theirs| overlaps(theirs, &excerpt))
+                })
+                .collect();
+            // A reader of another operation made only of words this act wanted, with plain
+            // values, re-read them; one of the same operation is another half of this request.
+            let second_readings = readers.iter().all(|other| {
+                other.action != act.action
+                    && other.target == act.target
+                    && !waited_on(other.id)
+                    && other.arguments.values().all(|theirs| {
+                        matches!(theirs.value, ArgumentValue::Json(_))
+                            && theirs
+                                .excerpt
+                                .is_some_and(|theirs| wanted.iter().any(|w| overlaps(&theirs, w)))
+                    })
+            });
+            if second_readings && !act.arguments.contains_key(name) {
+                act.arguments.insert(name.clone(), given.clone());
+                missing.retain(|other| other != name);
+                dropped.extend(readers.iter().map(|other| other.id));
+            }
+        }
+        act.status = if missing.is_empty() {
+            ActStatus::Ready
+        } else {
+            ActStatus::NeedsValue {
+                arguments: missing,
+                reason: None,
+            }
+        };
+    }
+    chained.retain(|outcome| !matches!(outcome, Chained::Act(act) if dropped.contains(&act.id)));
+}
+
+/// An act of another operation whose every value re-reads words within those a ready act on the
+/// same record already uses is a second reading of them, and goes: the ready act does what they
+/// say. Of two acts reading the same words, the one kept is never dropped for the other.
+fn second_readings_go(chained: &mut Vec<Chained>) {
+    use turnframe_core::understanding::{ArgumentValue, Excerpt, UnderstoodAct};
+    let acts: Vec<UnderstoodAct> = chained
+        .iter()
+        .filter_map(|outcome| match outcome {
+            Chained::Act(act) => Some(act.clone()),
+            _ => None,
+        })
+        .collect();
+    let waited_on = |id: ActId| acts.iter().any(|act| act.depends_on.contains(&id));
+    let within = |mine: &Excerpt, theirs: &Excerpt| {
+        theirs.message == mine.message
+            && theirs.words.first <= mine.words.first
+            && mine.words.last <= theirs.words.last
+    };
+    let mut gone: Vec<ActId> = Vec::new();
+    for act in &acts {
+        let reread = !act.arguments.is_empty()
+            && !waited_on(act.id)
+            && acts.iter().any(|ready| {
+                ready.id != act.id
+                    && !gone.contains(&ready.id)
+                    && ready.status == ActStatus::Ready
+                    && ready.action != act.action
+                    && ready.target == act.target
+                    && act.arguments.values().all(|given| {
+                        matches!(given.value, ArgumentValue::Json(_))
+                            && given.excerpt.is_some_and(|mine| {
+                                // A value pointed at its whole part says nothing of its words.
+                                ready
+                                    .arguments
+                                    .values()
+                                    .filter_map(|theirs| theirs.excerpt)
+                                    .filter(|theirs| {
+                                        !(theirs.words.first <= ready.words.first
+                                            && ready.words.last <= theirs.words.last)
+                                    })
+                                    .any(|theirs| within(&mine, &theirs))
+                            })
+                    })
+            });
+        if reread {
+            gone.push(act.id);
+        }
+    }
+    chained.retain(|outcome| !matches!(outcome, Chained::Act(act) if gone.contains(&act.id)));
+}
+
+/// Two acts of one message waiting on the same operation and record, whose values agree and
+/// together give what each waits for, are one act: a request its parts cut in two.
+fn halves_of_one_request(chained: &mut Vec<Chained>) {
+    use turnframe_core::understanding::UnderstoodAct;
+    let waiting = |act: &UnderstoodAct| match &act.status {
+        ActStatus::NeedsValue {
+            arguments,
+            reason: None,
+        } => Some(arguments.clone()),
+        _ => None,
+    };
+    let completes = |a: &UnderstoodAct, b: &UnderstoodAct| {
+        let (Some(missing_a), Some(missing_b)) = (waiting(a), waiting(b)) else {
+            return false;
+        };
+        a.action == b.action
+            && a.target == b.target
+            && a.arguments.iter().all(|(name, given)| {
+                b.arguments
+                    .get(name)
+                    .is_none_or(|other| other.value == given.value)
+            })
+            && missing_a.iter().all(|name| b.arguments.contains_key(name))
+            && missing_b.iter().all(|name| a.arguments.contains_key(name))
+    };
+    loop {
+        let acts: Vec<(usize, &UnderstoodAct)> = chained
+            .iter()
+            .enumerate()
+            .filter_map(|(at, outcome)| match outcome {
+                Chained::Act(act) => Some((at, act)),
+                _ => None,
+            })
+            .collect();
+        let pair = acts.iter().find_map(|(first, a)| {
+            acts.iter()
+                .find(|(second, b)| second > first && completes(a, b))
+                .map(|(second, _)| (*first, *second))
+        });
+        let Some((first, second)) = pair else {
+            return;
+        };
+        let Chained::Act(later) = chained.remove(second) else {
+            return;
+        };
+        if let Chained::Act(act) = &mut chained[first] {
+            for (name, given) in later.arguments {
+                act.arguments.entry(name).or_insert(given);
+            }
+            for dependency in later.depends_on {
+                if !act.depends_on.contains(&dependency) {
+                    act.depends_on.push(dependency);
+                }
+            }
+            act.status = ActStatus::Ready;
+        }
+    }
+}
+
 /// The same act asked twice in one message, the same operation on the same record with the
 /// same values, is one act: the later copy is dropped, unless another act waits on it. So is
 /// one whose values another act of it all gives, with more beside them.
@@ -1317,10 +1856,11 @@ fn not_asked_quietly(units: &[Seg], chained: &mut Vec<Chained>) {
 
 /// A record named by the name one record this message creates is given, or by words of this
 /// message around the words that name it, is that record: the name is not looked up among the
-/// records that exist, and the act waits for the creation.
+/// records that exist, and the act waits for the creation. The one record of its kind the
+/// message creates with no name is the record named, and takes the name.
 fn named_as_created(turn: &UnderstandingInput, chained: &mut [Chained]) {
     use turnframe_core::understanding::{ActTarget, ArgumentValue, MessageRef, RecordValue};
-    type Created = (ActId, WorkflowKey, String, Option<WordRange>);
+    type Created = (ActId, WorkflowKey, Option<String>, Option<WordRange>);
     let created: Vec<Created> = chained
         .iter()
         .filter_map(|outcome| match outcome {
@@ -1331,11 +1871,12 @@ fn named_as_created(turn: &UnderstandingInput, chained: &mut [Chained]) {
                     _ => return None,
                 };
                 let words = name_words(turn, act);
-                Some((act.id, workflow, name_given(turn, act)?, words))
+                Some((act.id, workflow, name_given(turn, act), words))
             }
             _ => None,
         })
         .collect();
+    let mut naming: Vec<(ActId, String)> = Vec::new();
     for outcome in chained.iter_mut() {
         let Chained::Act(act) = outcome else {
             continue;
@@ -1354,16 +1895,28 @@ fn named_as_created(turn: &UnderstandingInput, chained: &mut [Chained]) {
                         && words.last <= excerpt.words.last
                 })
             };
-            let matching: Vec<ActId> = created
+            let of_its_kind: Vec<&Created> = created
                 .iter()
-                .filter(|(creation, of, name, words)| {
-                    *creation != id && of == workflow && (same_name(name, named) || around(words))
+                .filter(|(creation, of, ..)| *creation != id && of == workflow)
+                .collect();
+            let matching: Vec<ActId> = of_its_kind
+                .iter()
+                .filter(|(_, _, name, words)| {
+                    name.as_deref().is_some_and(|name| same_name(name, named)) || around(words)
                 })
                 .map(|(creation, ..)| *creation)
                 .collect();
+            let unnamed = match of_its_kind.as_slice() {
+                [(creation, _, None, _)] => Some(*creation),
+                _ => None,
+            };
             if let [creation] = matching.as_slice() {
                 argument.value = ArgumentValue::Record(RecordValue::SameTurn { act: *creation });
                 waits.push(*creation);
+            } else if let (true, Some(creation)) = (matching.is_empty(), unnamed) {
+                naming.push((creation, named.clone()));
+                argument.value = ArgumentValue::Record(RecordValue::SameTurn { act: creation });
+                waits.push(creation);
             }
         }
         for creation in waits {
@@ -1372,11 +1925,15 @@ fn named_as_created(turn: &UnderstandingInput, chained: &mut [Chained]) {
             }
         }
     }
+    for (creation, named) in naming {
+        names_the_created_record(turn, chained, creation, &named);
+    }
 }
 
 /// An act waiting on a record this message creates, whose creating act is gone, takes the one
 /// other record of that workflow the message still creates: the gone one was a second
-/// reading of it. With none or several, it stays waiting on what is gone and is held.
+/// reading of it. With none or several, it stays waiting on what is gone and is held. When
+/// the one left is the act itself, it is that creation, and creates its own record.
 fn the_one_created(creations: &[Creation], chained: &mut [Chained]) {
     use turnframe_core::understanding::{ActTarget, ArgumentValue, RecordValue};
     let present: Vec<ActId> = chained
@@ -1412,6 +1969,20 @@ fn the_one_created(creations: &[Creation], chained: &mut [Chained]) {
             let Some(one) = standing(dependency) else {
                 continue;
             };
+            if one == act.id {
+                let workflow = creations
+                    .iter()
+                    .find(|c| c.act == one)
+                    .map(|c| c.workflow.clone());
+                act.depends_on.retain(|depended| *depended != dependency);
+                if let (ActTarget::SameTurn { act: created }, Some(workflow)) =
+                    (&act.target, workflow)
+                    && *created == dependency
+                {
+                    act.target = ActTarget::New { workflow };
+                }
+                continue;
+            }
             for depended in &mut act.depends_on {
                 if *depended == dependency {
                     *depended = one;
@@ -1790,6 +2361,19 @@ fn small_talk_stands(
             Some([Routed::Nothing(NotUnderstoodReason::NoOperation)])
         );
         if inside && nothing {
+            unit.unit = SegmentedUnit::Chitchat { words: unit.span };
+            routes.remove(&unit.id);
+        }
+    }
+}
+
+/// A part that says no to the offers of the last reply asks for nothing: it is small talk.
+fn declining_is_talk(units: &mut [Seg], routes: &mut BTreeMap<UnitId, Vec<Routed>>) {
+    for unit in units.iter_mut() {
+        if matches!(
+            routes.get(&unit.id).map(Vec::as_slice),
+            Some([Routed::Declined])
+        ) {
             unit.unit = SegmentedUnit::Chitchat { words: unit.span };
             routes.remove(&unit.id);
         }

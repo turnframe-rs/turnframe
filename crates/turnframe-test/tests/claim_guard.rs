@@ -162,6 +162,7 @@ fn assistant_turn(receipts: &[OperationalReceipt]) -> AssistantTurn {
         expectations: Vec::new(),
         replay_token: ReplayToken::from("replay-1"),
         done: Vec::new(),
+        offers: Vec::new(),
     }
 }
 

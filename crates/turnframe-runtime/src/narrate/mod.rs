@@ -129,7 +129,7 @@ impl Narrator<'_> {
             material,
             has_ask: input.outcome.ask.is_some(),
             elsewhere: input.outcome.ask.as_ref().is_some_and(|ask| ask.elsewhere),
-            has_next: !input.outcome.next.is_empty(),
+            next: input.outcome.next.len(),
             closing: input.outcome.closing.is_some(),
             on_screen: input.on_screen,
             carries: !input.answers.is_empty() || !input.notices.is_empty(),

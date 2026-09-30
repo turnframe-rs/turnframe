@@ -1,14 +1,16 @@
 //! Assembly: the task outputs, in message order, as one [`Understanding`].
 //!
 //! It is a function of the outputs alone. A unit not understood holds every act aimed
-//! at the same record, and an act whose same-turn prerequisite is gone is held too.
+//! at the same record, unless its only reading was found not asked for, and an act whose
+//! same-turn prerequisite is gone is held too.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use turnframe_core::ids::OptionId;
 use turnframe_core::understanding::{
-    ActId, ActStatus, ActTarget, CardAnswer, Dispute, MessageRef, NotUnderstood, Superseded,
-    TurnConstraint, Understanding, UnderstoodAct, UnderstoodQuestion, Unit, UnitId,
+    ActId, ActStatus, ActTarget, CardAnswer, Dispute, MessageRef, NotUnderstood,
+    NotUnderstoodReason, Superseded, TurnConstraint, Understanding, UnderstoodAct,
+    UnderstoodQuestion, Unit, UnitId,
 };
 
 use crate::pipeline::{Chained, Seg};
@@ -32,12 +34,14 @@ pub(crate) fn assemble(
                 reason,
                 aimed: target,
             } => {
+                // A reading found not asked for asks nothing of its record.
+                let asks = !matches!(reason, NotUnderstoodReason::NotRequested);
                 not_understood.push(NotUnderstood {
                     unit,
                     words,
                     reason,
                 });
-                if let Some(target) = target {
+                if let Some(target) = target.filter(|_| asks) {
                     aimed.push((unit, target));
                 }
             }
@@ -85,6 +89,7 @@ pub(crate) fn assemble(
             .flatten();
         (act.words.first, place, act.id)
     });
+    let acts = after_what_each_waits_on(acts);
     not_understood.sort_by_key(|item| (item.words.first, item.unit));
 
     let mut understanding = Understanding {
@@ -134,4 +139,21 @@ pub(crate) fn assemble(
         }
     }
     understanding
+}
+
+/// `acts` in their order, save that each follows the acts of this message it waits on:
+/// one waiting on a record created later in the message is done after it.
+fn after_what_each_waits_on(mut acts: Vec<UnderstoodAct>) -> Vec<UnderstoodAct> {
+    let present: BTreeSet<ActId> = acts.iter().map(|act| act.id).collect();
+    let mut placed: Vec<UnderstoodAct> = Vec::with_capacity(acts.len());
+    while !acts.is_empty() {
+        let done = |dep: &ActId| !present.contains(dep) || placed.iter().any(|act| act.id == *dep);
+        // Acts waiting on each other keep their order.
+        let next = acts
+            .iter()
+            .position(|act| act.depends_on.iter().all(done))
+            .unwrap_or(0);
+        placed.push(acts.remove(next));
+    }
+    placed
 }

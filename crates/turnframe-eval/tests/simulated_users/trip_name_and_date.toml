@@ -1,0 +1,55 @@
+id = "trip.name_and_date"
+name = "A trip gets its name and its travel date"
+want = "You look after the trip «Trip 1» of Marta Bianchi. Give it the name «Lisbon offsite», and set the day she would rather fly to 21 October 2026."
+manners = [
+    "terse: a few words per message",
+    "chatty and polite: both things in one long message",
+    "gives the date as 20 October first, then corrects it to 21 October without restating the year",
+]
+max_turns = 8
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "4cd2bc71-4b2e-87e2-a6a2-f7436f18babe"
+description = "Checked bag"
+quantity = 1
+unit_price_cents = 25000
+payer = "airline"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[[reached.case_state]]
+case_id = "trip-1"
+path = "/name"
+one_of = ["Lisbon offsite", "Lisbon Offsite"]
+
+[[reached.case_state]]
+case_id = "trip-1"
+path = "/travel_date"
+equals = "2026-10-21"

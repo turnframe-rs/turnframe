@@ -38,6 +38,7 @@
 //! | [`report`] | per item and per suite, with §26.3's categories kept apart |
 //! | [`control`] | the same corpus twice against the same code: the noise floor |
 //! | [`baseline`] | a deterministic regression, told apart from a judge drift |
+//! | [`simulate`] | goal-driven conversations with a simulated user, scored by code |
 //!
 //! # An item
 //!
@@ -109,6 +110,7 @@ pub mod judge;
 pub mod observation;
 pub mod report;
 pub mod runner;
+pub mod simulate;
 pub mod understanding;
 
 /// The items an evaluation usually wants: `use turnframe_eval::prelude::*;`.

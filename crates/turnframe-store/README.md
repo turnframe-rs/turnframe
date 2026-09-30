@@ -11,7 +11,7 @@ document and the rustdoc alone, over whatever database you already run.
 
 ```toml
 [dependencies]
-turnframe-store = "0.1"
+turnframe-store = "0.2"
 ```
 
 ## Scope

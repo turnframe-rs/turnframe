@@ -104,7 +104,7 @@ Install only the facade and pick features:
 
 ```toml
 [dependencies]
-turnframe = { version = "0.1", features = ["openai", "postgres", "telemetry"] }
+turnframe = { version = "0.2", features = ["openai", "postgres", "telemetry"] }
 ```
 
 | Crate | Role |

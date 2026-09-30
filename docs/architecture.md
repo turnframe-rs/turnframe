@@ -88,7 +88,8 @@ In detail, as the runtime executes it:
    contract and gets a repair round, and never produces a reading that validates, resolves to
    nothing and silently does less than it said.
 4. **Understand.** A fixed chain of small tasks reads the message: `segment` splits it into
-   units, `coverage` checks nothing was missed, `route` chooses each request's operations, `locate`
+   units, `coverage` checks nothing was missed, `take_up` reads each request against the offers of
+   the last reply, `route` chooses each request's operations, `locate`
    its record when several could be meant, `extract` each argument, and `verify` checks the act
    against the user's words. Questions are framed on their record and topic. Each step is streamed
    as it is decided. See §5.
@@ -103,7 +104,9 @@ In detail, as the runtime executes it:
    to the newest, first, or most plausible candidate.
 8. **Reduce the whole turn.** Corrections supersede earlier acts, cancellations win, constraints
    block whole classes of act, hypothetical questions stay questions, and every act receives an
-   explicit result. Nothing has executed yet.
+   explicit result. An act on a record an earlier act of the message opens is checked against
+   the state that opening leaves, when the workflow says what a command leaves
+   (`WorkflowDefinition::state_after`). Nothing has executed yet.
 9. **Apply policy.** Each compiled command carries a risk class and a confirmation policy.
    Consequential commands need a server-issued origin such as a confirmed interaction bound to the
    right kind of card; a model proposal is not a valid origin, and there is no enum variant that
@@ -123,8 +126,8 @@ In detail, as the runtime executes it:
 
 ## 3. The invariants
 
-The spec states twenty invariants. They are the reason the pipeline has the shape it has. Each one
-below names where it lives.
+The spec states twenty invariants, and ADR-021 adds two that keep a conversation moving. They are
+the reason the pipeline has the shape it has. Each one below names where it lives.
 
 | # | Invariant | Enforced by |
 |---|-----------|-------------|
@@ -148,6 +151,8 @@ below names where it lives.
 | I18 | Model answers are all-or-nothing | structured parsing rejects a task's whole answer |
 | I19 | Critical state reads fail closed | an unverifiable ownership, revision or confirmation blocks execution |
 | I20 | Replay is possible | the replay record stores versions, hashes, resolutions, decisions and outcomes |
+| I21 | Every reply ends on a way forward | the outcome always holds the ask, a card, next steps or a closing question, the reply code writes ends on it, and the review checks the writer's does |
+| I22 | An offer is one the domain accepts now | a next step is a typed operation, dry-run against the view and the state before it is offered |
 
 Reliability is measured against these separately, never as one accuracy number. See the
 [reliability model](reliability-model.md).
@@ -208,9 +213,10 @@ schema built for the turn in hand, and code checks every answer before the next 
 |------|----------|------------------|
 | `segment` | which units the message holds | every unit points at words the message has, and no two share a word |
 | `coverage` | whether a request or question was missed | a found unit must lie in words no unit holds, or in words read as small talk or a dispute, which it may turn into a question; read there as an act, the words go back to segmentation once; a second reading of small talk runs nothing and is reported unclear, and a second reading of a dispute stands; a question right after a question is its tail; a constraint in words no unit holds sends the segmentation back once, then fails the turn closed; a lone word between two parts joins them, and is no constraint or request of its own |
-| `route` | which offered operations a request asks for, in order | each answer is one of the keys on offer, or none alone; one asked for twice is listed twice |
+| `take_up` | which offer of the last reply a request takes up, or whether it declines them (only when the last reply offered anything) | the answer is one of the offers' handles, declines or none; an offer taken up is the act, on its record, with nothing routed or located again; a part that declines is small talk |
+| `route` | which offered operations a request asks for, in order | each answer is one of the keys on offer, or none alone; one asked for twice is listed twice; a new record asked for in words naming a record of its workflow in view by its whole label is routed once more, told it exists |
 | `locate` | which record it is about | the answer is a handle in view, a new record, or one the user named |
-| `extract` | each argument's value | the value points at the user's words, and a text value copies them; dates and amounts are computed by code |
+| `extract` | each argument's value | the value points at the user's words, and a text value copies them; dates and amounts are computed by code, and a date a correction gives without its year takes the year of the date it corrects |
 | `verify` | whether the act matches what was said | the verdict names each argument it doubts, and why |
 | `question_frame` | which record and subjects a question is about | handles and subjects come from the brief |
 | `cross_check` | whether the whole reading says what the message says (`high` effort only) | each finding names an act and argument the reading has, or words nothing holds |

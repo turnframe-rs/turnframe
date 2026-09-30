@@ -3,6 +3,7 @@
 
 use turnframe_core::case::{CaseKey, CaseRef};
 use turnframe_core::error::OrchestratorError;
+use turnframe_core::flow::NextStep;
 use turnframe_core::ids::BlockId;
 use turnframe_core::observe::{Signal, SignalLabels};
 use turnframe_core::reduce::{PlannedActResult, ReductionPlan};
@@ -51,7 +52,7 @@ impl Session<'_> {
             .filter(|(_, case)| case.terms.subject_only_when_named)
             .map(|(key, _)| key.clone())
             .collect();
-        let (views, follow_up, case_refresh_unavailable) =
+        let (views, states, follow_up, case_refresh_unavailable) =
             self.views_and_follow_up(execution, plan).await;
         let named = self.named_workflows(plan);
         let case_labels: Vec<CaseLabel> = self
@@ -122,14 +123,57 @@ impl Session<'_> {
         let (disputes, contested) = self.disputes();
         let started = started(plan);
         let workflows = self.runtime.workflows.definitions();
-        let next_steps: Vec<(CaseKey, Vec<turnframe_core::locale::LocalizedText>)> = views
+        let next_steps: Vec<(CaseRef, Vec<NextStep>)> = views
             .iter()
             .filter(|view| touched.contains(&view.case_ref.key()))
             .filter_map(|view| {
                 let definition = workflows.get(&view.case_ref.workflow)?;
-                let steps = definition.next_steps(view).ok()?;
-                (!steps.is_empty()).then(|| (view.case_ref.key(), steps))
+                let state = states.get(&view.case_ref.key()).cloned().flatten();
+                let steps: Vec<NextStep> = definition
+                    .next_steps(view.case_ref.clone(), state.as_ref())
+                    .ok()?
+                    .into_iter()
+                    .filter(|step| {
+                        offerable(definition.as_ref(), &view.case_ref, state.as_ref(), step)
+                    })
+                    .collect();
+                (!steps.is_empty()).then(|| (view.case_ref.clone(), steps))
             })
+            .collect();
+        // A record a request needed and none of exists is offered, by the operation opening one.
+        let openings: Vec<(CaseRef, turnframe_core::ids::OperationKey, String)> = self
+            .none_yet
+            .iter()
+            .filter_map(|workflow| {
+                let definition = workflows.get(workflow)?;
+                let fresh = CaseRef::new(
+                    workflow.clone(),
+                    "",
+                    turnframe_core::ids::CaseRevision::ZERO,
+                );
+                let opening = definition
+                    .operations(fresh.clone(), None)
+                    .ok()?
+                    .into_iter()
+                    .find(|spec| {
+                        spec.target_policy == turnframe_core::plan::TargetPolicy::NewCaseOnly
+                    })?;
+                let noun = definition.noun().map_or_else(
+                    || workflow.to_string(),
+                    |noun| noun.resolve(&self.input.locale).to_owned(),
+                );
+                Some((fresh, opening.key, noun))
+            })
+            .collect();
+        // Cards earlier turns left open are still on screen: the reply may point to one.
+        let open_cards: Vec<turnframe_core::interaction::Interaction> = self
+            .runtime
+            .interactions
+            .open_for_conversation(self.account(), &self.input.conversation_id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|card| !interactions.iter().any(|created| created.id == card.id))
             .collect();
         let input = CompositionInput::new(&self.input)
             .with_attachments(self.attachments.parts.clone())
@@ -138,10 +182,17 @@ impl Session<'_> {
             .with_answer_tasks(&plan.answer_tasks)
             .with_events(&execution.events)
             .with_interactions(&interactions)
+            .with_open_cards(&open_cards)
             .with_views(&views)
             .with_subjects(&subjects)
             .with_touched(&touched)
             .with_next_steps(&next_steps)
+            .with_openings(&openings)
+            .with_asked_before(
+                self.previous
+                    .as_ref()
+                    .map_or(&[][..], |previous| previous.expectations.as_slice()),
+            )
             .with_beside(&beside)
             .with_effort(Some(&self.effort))
             .with_disputes(&disputes)
@@ -641,4 +692,60 @@ fn spent_together(
         spent.exhausted.clone_from(&second.exhausted);
     }
     spent
+}
+
+/// Whether the domain would take `step` on the case now (I22): the view offers its operation
+/// and, when its arguments are complete, the act compiles to commands that all validate. A step
+/// still missing values is offered on the operation alone; they are asked when it is taken up.
+fn offerable(
+    definition: &dyn turnframe_core::flow::ErasedWorkflow,
+    case_ref: &CaseRef,
+    state: Option<&serde_json::Value>,
+    step: &NextStep,
+) -> bool {
+    let Ok(offered) = definition.operations(case_ref.clone(), state) else {
+        return false;
+    };
+    let Some(spec) = offered
+        .iter()
+        .find(|spec| spec.key == step.operation && spec.availability.is_proposable())
+    else {
+        return false;
+    };
+    // Values asked when the step is taken up are tried from the operation's own examples:
+    // with none that completes them, the step is offered on the operation alone.
+    let known = serde_json::Value::Object(step.arguments.clone());
+    let arguments = if spec.check_arguments(&known).is_ok() {
+        known
+    } else {
+        let completed = spec.examples.iter().find_map(|example| {
+            let mut arguments = example.arguments.clone();
+            arguments.extend(step.arguments.clone());
+            let arguments = serde_json::Value::Object(arguments);
+            spec.check_arguments(&arguments)
+                .is_ok()
+                .then_some(arguments)
+        });
+        match completed {
+            Some(arguments) => arguments,
+            None => return true,
+        }
+    };
+    let act = turnframe_core::target::ResolvedAct {
+        act: turnframe_core::understanding::ActId::new(turnframe_core::understanding::UnitId(0), 0),
+        kind: turnframe_core::target::ResolvedActKind::ApplyOperation {
+            operation: step.operation.clone(),
+        },
+        case_ref: case_ref.clone(),
+        arguments,
+        evidence_digest: turnframe_core::hash::Digest::of_bytes(b"turnframe.offer"),
+    };
+    definition
+        .compile_act(case_ref.clone(), state, &act)
+        .is_ok_and(|commands| {
+            !commands.is_empty()
+                && commands
+                    .iter()
+                    .all(|command| definition.validate_command(state, command).is_ok())
+        })
 }

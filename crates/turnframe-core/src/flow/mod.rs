@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use crate::case::{CaseRef, Versioned};
 use crate::command::RiskClass;
 use crate::error::{DomainRejection, ExecutionError, HashError, StoreError};
-use crate::ids::{AccountId, CaseId, WorkflowKey, WorkflowVersion};
+use crate::ids::{AccountId, CaseId, OperationKey, WorkflowKey, WorkflowVersion};
 use crate::interaction::{
     InteractionKind, InteractionPayload, InteractionSpec, TextResolutionPolicy,
 };
@@ -81,6 +81,41 @@ impl ObligationId {
 impl std::fmt::Display for ObligationId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+/// A step the user may take next, offered by a case that owes nothing: an operation, the
+/// arguments already known, and the words the reply offers it in.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct NextStep {
+    /// The operation it runs.
+    pub operation: OperationKey,
+    /// The words the reply offers it in.
+    pub words: LocalizedText,
+    /// The arguments already known, by name; the rest are asked when it is taken up.
+    pub arguments: serde_json::Map<String, serde_json::Value>,
+}
+
+impl NextStep {
+    /// A step running `operation`, offered in `words`, with no argument known yet.
+    #[must_use]
+    pub fn new(operation: impl Into<OperationKey>, words: LocalizedText) -> Self {
+        Self {
+            operation: operation.into(),
+            words,
+            arguments: serde_json::Map::new(),
+        }
+    }
+
+    /// With the arguments already known, an object by name: any other value gives none.
+    #[must_use]
+    pub fn with_arguments(mut self, arguments: serde_json::Value) -> Self {
+        self.arguments = match arguments {
+            serde_json::Value::Object(named) => named,
+            _ => serde_json::Map::new(),
+        };
+        self
     }
 }
 
@@ -809,6 +844,13 @@ pub trait WorkflowDefinition: Send + Sync + 'static {
     /// The operations offered in this view, with their arguments, labels and examples.
     fn operations(&self, view: &ViewOf<Self>) -> Vec<OperationSpec>;
 
+    /// Every operation a record of this workflow may offer, in any phase. Understanding is
+    /// shown them while none of its records is in view, so a request for one is told there
+    /// is none yet, and offered to open one, instead of going unread. The default is empty.
+    fn record_operations(&self) -> Vec<OperationSpec> {
+        Vec::new()
+    }
+
     /// Guidance for understanding a turn about a record in *this* view. `None`, the
     /// default, is ordinary.
     ///
@@ -983,12 +1025,13 @@ pub trait WorkflowDefinition: Send + Sync + 'static {
         Vec::new()
     }
 
-    /// What the user may do next once the case owes nothing, each a sentence in the
-    /// workflow's words: the reply offers them when the case needs nothing more.
+    /// What the user may do next once the case owes nothing, each an operation with its
+    /// words: the reply offers them when the case needs nothing more, and only those the
+    /// runtime's dry run of the act on `state` accepts (I22).
     ///
     /// The default is empty, which offers nothing.
-    fn next_steps(&self, view: &ViewOf<Self>) -> Vec<crate::locale::LocalizedText> {
-        let _ = view;
+    fn next_steps(&self, state: Option<&Self::State>, view: &ViewOf<Self>) -> Vec<NextStep> {
+        let _ = (state, view);
         Vec::new()
     }
 
@@ -1094,6 +1137,19 @@ pub trait WorkflowDefinition: Send + Sync + 'static {
         state: Option<&Self::State>,
         command: &Self::Command,
     ) -> Result<(), DomainRejection>;
+
+    /// The state a valid `command` leaves `state` in, when the workflow can tell without
+    /// executing it. An act on a record an earlier act of the same message opens is
+    /// compiled and validated against the state the opening leaves; with `None`, the
+    /// default, it is checked against no state, and a domain that needs the record refuses.
+    fn state_after(
+        &self,
+        state: Option<&Self::State>,
+        command: &Self::Command,
+    ) -> Option<Self::State> {
+        let _ = (state, command);
+        None
+    }
 
     /// Renders receipts from committed events (spec §17.3).
     ///

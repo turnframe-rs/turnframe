@@ -629,6 +629,7 @@ mod tests {
             subjects: Vec::new(),
             expectations: Vec::new(),
             done: Vec::new(),
+            offers: Vec::new(),
         }
     }
 

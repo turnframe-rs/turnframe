@@ -97,6 +97,9 @@ const CLOSING: &str = "nothing is asked and nothing comes next: end with a short
 /// The note for an ask about a record the turn did not reach.
 const ELSEWHERE: &str = "the ask is about another record than the rest of the outcome: its question names that record by its label, so the user knows which one it asks about.";
 
+/// The note for an ask the last reply asked too.
+const AGAIN: &str = "again says the ask is the one the last reply asked, still open: before asking it, say in a few words that you still need it to go on; then say the user may also do something else, offering next when it is there.";
+
 /// What each part of an outcome is for, said only for the parts an outcome holds: a
 /// small model acts on a note about a part that is not there.
 fn outcome_notes(outcome: &TurnOutcome, carries: bool) -> Vec<&'static str> {
@@ -106,6 +109,9 @@ fn outcome_notes(outcome: &TurnOutcome, carries: bool) -> Vec<&'static str> {
         ];
         if outcome.ask.as_ref().is_some_and(|ask| ask.elsewhere) {
             notes.push(ELSEWHERE);
+        }
+        if outcome.ask.as_ref().is_some_and(|ask| ask.again) {
+            notes.push(AGAIN);
         }
         return notes;
     }
@@ -128,14 +134,20 @@ fn outcome_notes(outcome: &TurnOutcome, carries: bool) -> Vec<&'static str> {
     if outcome.ask.is_some() {
         notes.push("ask is the one thing to ask for next. End with exactly that question, in your own words, about that record. Ask for nothing else, and offer no list of options. When it has a because, say that reason first, in a few words.");
     }
+    if outcome.ask.as_ref().is_some_and(|ask| ask.again) {
+        notes.push(AGAIN);
+    }
     if outcome.card.is_some() {
         notes.push("card is a card on screen with its buttons. Point the user to it briefly.");
+    }
+    if !outcome.standing.is_empty() {
+        notes.push("standing is where the record of a question no fact answers stands: after saying you cannot tell, say in a few words what it holds, from standing alone.");
     }
     if outcome.closing.is_some() {
         notes.push(CLOSING);
     }
-    if !outcome.next.is_empty() {
-        notes.push("next lists what the user may do now that the record needs nothing more. End by offering it in a few words of your own, as one question.");
+    if !outcome.next.is_empty() && outcome.ask.is_none() {
+        notes.push("next lists what the user may do now that the record needs nothing more. End by offering every item it lists, in a few words of your own, as one question.");
     }
     notes
 }
@@ -415,8 +427,8 @@ pub(crate) struct ReviewInput<'a> {
     pub has_ask: bool,
     /// Whether that ask is about a record the turn did not reach, which the reply names.
     pub elsewhere: bool,
-    /// Whether the material lists what the user may do next.
-    pub has_next: bool,
+    /// How many things the material lists that the user may do next.
+    pub next: usize,
     /// Whether nothing is asked and nothing comes next, so the reply invites the user on.
     pub closing: bool,
     pub on_screen: &'a [String],
@@ -466,7 +478,7 @@ impl ReviewInput<'_> {
             .filter(|(name, _)| match *name {
                 "asks_the_ask" | "asks_anything_else" => self.has_ask,
                 "names_the_record" => self.has_ask && self.elsewhere,
-                "offers_the_next" => self.has_next && !self.has_ask,
+                "offers_the_next" => self.next > 0 && !self.has_ask,
                 "invites_to_go_on" => self.closing,
                 "contradicts_screen" => !self.on_screen.is_empty(),
                 "leaves_something_out" => self.carries,
@@ -601,7 +613,15 @@ impl<'a> ModelTask for Review<'a> {
         let checks: Vec<String> = input
             .checks()
             .into_iter()
-            .map(|(name, question)| format!("- {name}: {question}"))
+            .map(|(name, question)| match name {
+                // Offering one of several is not offering them: the question counts them.
+                "offers_the_next" if input.next > 1 => format!(
+                    "- {name}: Does it end by offering every one of the {} things next lists, \
+                     in any words?",
+                    input.next
+                ),
+                _ => format!("- {name}: {question}"),
+            })
             .collect();
         let _ = write!(out, "\n\nChecks:\n{}", checks.join("\n"));
         vec![Message::user(out)]
@@ -710,7 +730,7 @@ mod tests {
             material: Value::Null,
             has_ask: true,
             elsewhere: true,
-            has_next: true,
+            next: 1,
             closing: true,
             on_screen: &on_screen,
             carries: true,
@@ -730,7 +750,7 @@ mod tests {
             material: Value::Null,
             has_ask: false,
             elsewhere: false,
-            has_next: false,
+            next: 0,
             closing: false,
             on_screen: &[],
             carries: false,
@@ -748,8 +768,10 @@ mod tests {
                 what: "What is B?".to_owned(),
                 because: None,
                 question: "A 2: What is B?".to_owned(),
+                again: false,
                 elsewhere,
                 expectation: None,
+                about: None,
             }),
             ..TurnOutcome::default()
         }
@@ -796,13 +818,13 @@ mod tests {
 
     #[test]
     fn a_review_checks_the_reply_ends_on_a_way_forward() {
-        let checks = |has_ask, has_next, closing| {
+        let checks = |has_ask, has_next: bool, closing| {
             let review = ReviewInput {
                 reply: "Done.",
                 material: Value::Null,
                 has_ask,
                 elsewhere: false,
-                has_next,
+                next: usize::from(has_next),
                 closing,
                 on_screen: &[],
                 carries: false,
@@ -824,6 +846,30 @@ mod tests {
     }
 
     #[test]
+    fn every_next_step_is_to_be_offered_and_the_review_counts_them() {
+        let review = ReviewInput {
+            reply: "Done. Add another item?",
+            material: Value::Null,
+            has_ask: false,
+            elsewhere: false,
+            next: 2,
+            closing: false,
+            on_screen: &[],
+            carries: false,
+        };
+        let shown = format!("{:?}", Review(PhantomData).render(&review));
+        assert!(
+            shown.contains("every one of the 2 things next lists"),
+            "{shown}"
+        );
+        let offering = TurnOutcome {
+            next: vec!["Add another item.".to_owned(), "Send it.".to_owned()],
+            ..TurnOutcome::default()
+        };
+        assert!(acknowledged(&offering).contains("offering every item it lists"));
+    }
+
+    #[test]
     fn a_review_checks_the_ask_names_a_record_the_turn_did_not_reach() {
         let checks = |elsewhere| {
             let review = ReviewInput {
@@ -831,7 +877,7 @@ mod tests {
                 material: Value::Null,
                 has_ask: true,
                 elsewhere,
-                has_next: false,
+                next: 0,
                 closing: false,
                 on_screen: &[],
                 carries: false,

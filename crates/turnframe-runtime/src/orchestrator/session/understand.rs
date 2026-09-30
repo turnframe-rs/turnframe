@@ -101,6 +101,7 @@ impl Session<'_> {
         let text = self.input.text.clone().unwrap_or_default();
         let limit = self.runtime.config.interaction.max_selection_candidates;
         let mut found = std::collections::BTreeMap::new();
+        let mut none_yet: Vec<turnframe_core::understanding::ActId> = Vec::new();
         for (act, workflow, named) in unlisted(understanding, &text) {
             let candidates = self
                 .runtime
@@ -113,6 +114,15 @@ impl Session<'_> {
                 )
                 .await
                 .map_err(OrchestratorError::Store)?;
+            // Asked of no record in particular, with none of its workflow anywhere: none yet.
+            let none_at_all = named.is_none()
+                && candidates.is_empty()
+                && !self.cases.keys().any(|key| key.workflow == workflow);
+            if none_at_all {
+                none_yet.push(act);
+                self.no_record_yet(&workflow, operations);
+                continue;
+            }
             let mut keys = Vec::new();
             for candidate in candidates.into_iter().take(limit) {
                 keys.push(candidate.key.clone());
@@ -120,6 +130,7 @@ impl Session<'_> {
             }
             found.insert(act, keys);
         }
+        understanding.acts.retain(|act| !none_yet.contains(&act.id));
         let arguments = self.find_named_arguments(understanding, operations).await?;
         if found.values().all(Vec::is_empty) && arguments.values().all(|(keys, _)| keys.len() != 1)
         {
@@ -130,6 +141,49 @@ impl Session<'_> {
         aim_at_found(understanding, &found, resolver);
         fill_found_arguments(understanding, &arguments, resolver);
         Ok(true)
+    }
+
+    /// Tells the user there is no record of `workflow` for what they asked, and remembers
+    /// it so the reply offers to open one when one can be.
+    fn no_record_yet(
+        &mut self,
+        workflow: &turnframe_core::ids::WorkflowKey,
+        operations: &OperationCatalog,
+    ) {
+        let can_open = operations.iter().any(|spec| {
+            spec.workflow == *workflow && spec.target_policy == TargetPolicy::NewCaseOnly
+        });
+        let copy = &self.runtime.notice_copy;
+        let template = if can_open {
+            &copy.record_none_yet
+        } else {
+            &copy.record_none
+        };
+        let noun = self
+            .runtime
+            .workflows
+            .definitions()
+            .get(workflow)
+            .and_then(|definition| definition.noun())
+            .map_or_else(
+                || workflow.to_string(),
+                |noun| noun.resolve(&self.input.locale).to_owned(),
+            );
+        let text = template
+            .resolve(&self.input.locale)
+            .replace("{workflow}", &noun);
+        let code = crate::reduce::notice::RECORD_NONE_YET;
+        if !self.early_notices.iter().any(|notice| notice.code == code) {
+            self.early_notices.push(ServerNotice {
+                block_id: BlockId::from(format!("notice:{code}")),
+                code: code.to_owned(),
+                severity: NoticeSeverity::Info,
+                text: turnframe_core::locale::LocalizedText::new(text),
+            });
+        }
+        if can_open && !self.none_yet.contains(workflow) {
+            self.none_yet.push(workflow.clone());
+        }
     }
 
     /// Looks up each record argument that names a record not in view, loading the one

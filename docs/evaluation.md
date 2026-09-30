@@ -212,3 +212,71 @@ many cases of a workflow exist at the end, so a request that started two records
 one fails.
 
 What the corpus measured last is in [benchmarks](benchmarks.md).
+
+## Conversations with simulated users
+
+The corpus measures single messages, each written to pass. A person holds a conversation, answers
+what the assistant said, misspells, changes their mind. `turnframe_eval::simulate` measures that
+(ADR-021): a model plays a person with a goal and a manner, talks to the runtime until it says it
+is done or the goal's turn limit comes, and code scores the conversation.
+
+A goal is a `.toml` file:
+
+```toml
+id = "trip.name_and_date"
+name = "A trip gets its name and its travel date"
+want = "Give the trip «Trip 1» the name «Lisbon offsite», and set the travel date to 21 October 2026."
+manners = ["terse", "gives 20 October first, then corrects it to 21 October"]
+max_turns = 8
+
+[[setup.cases]]            # the world before the first turn, as a corpus item seeds it
+# ...
+
+[[reached.case_state]]     # the state that proves the goal reached
+case_id = "trip-1"
+path = "/travel_date"
+equals = "2026-10-21"
+```
+
+`want` is written for the simulator, with every value the person would give. Each manner is its
+own conversation. `reached` takes the corpus's `case_state`, `workflow_state` and `case_count`,
+and is checked on the stores once the conversation ends, whatever the person said.
+
+Each conversation is scored on:
+
+| Class | What counts |
+| --- | --- |
+| reached | the goal's state holds at the end |
+| turns | turns the person took |
+| dead ends | replies that ended on no question, no recorded ask, no card and no offer |
+| loops | replies that asked what the reply before them asked, of the same record |
+| not understood | parts of messages the understanding could not read |
+| refused | acts the domain refused |
+| offers refused | refused acts of an operation the reply before had offered |
+| failed turns | turns that failed outright |
+
+Dead ends and offers refused are guarantee violations (I21, I22) and must be zero. A run reports
+each class as a total and a rate per conversation, then the transcripts of the three worst: most
+violations first, then goals missed, then the longest. A conversation that misses its goal is a
+measurement, never a failed run.
+
+`crates/turnframe-eval/tests/simulated_users.rs` holds the conversations in `tests/simulated_users/`
+against a real endpoint. It needs the live key and `TURNFRAME_EVAL_SIMULATE`, so a live corpus run
+never starts one, and it never runs in continuous integration. It reads the live corpus's
+`TURNFRAME_EVAL_LIVE_VENDOR`, `TURNFRAME_EVAL_LIVE_MODEL`, `TURNFRAME_EVAL_LIVE_SAMPLES` and
+`TURNFRAME_EVAL_LIVE_CONCURRENCY`, and:
+
+| Variable | What it sets |
+| --- | --- |
+| `TURNFRAME_EVAL_SIMULATE` | any value: asks for this run |
+| `TURNFRAME_EVAL_SIMULATOR_MODEL` | the model playing the user, the one under test when unset |
+| `TURNFRAME_EVAL_SIMULATE_GOALS` | only these goal ids, separated by commas |
+| `TURNFRAME_EVAL_SIMULATE_REPORT` | an absolute path for the machine-readable report, transcripts included |
+
+```sh
+TURNFRAME_EVAL_LIVE_KEY=... TURNFRAME_EVAL_SIMULATE=1 TURNFRAME_EVAL_LIVE_MODEL=gpt-5.4-mini \
+  cargo test -p turnframe-eval --test simulated_users simulated_users_talk -- --nocapture
+```
+
+A failure found in a conversation is fixed as its class, by a guarantee or by structure, and the
+fix is kept when the class's rate falls.

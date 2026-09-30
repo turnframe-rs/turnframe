@@ -726,6 +726,7 @@ fn assistant_turn() -> impl Strategy<Value = AssistantTurn> {
             expectations: Vec::new(),
             replay_token: ReplayToken::from(token.as_str()),
             done: Vec::new(),
+            offers: Vec::new(),
         })
 }
 

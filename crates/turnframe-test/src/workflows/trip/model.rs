@@ -137,6 +137,7 @@ pub fn sample_new_extra(position: usize) -> NewExtra {
         description: description.to_owned(),
         quantity: u32::try_from(position).unwrap_or(0) + 1,
         unit_price_cents: 4_000,
+        payer: None,
     }
 }
 

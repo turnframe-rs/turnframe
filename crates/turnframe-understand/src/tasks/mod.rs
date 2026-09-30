@@ -21,6 +21,7 @@ pub mod question_frame;
 pub mod respects;
 pub mod route;
 pub mod segment;
+pub mod take_up;
 pub mod verify;
 
 use turnframe_tasks::StructuralError;

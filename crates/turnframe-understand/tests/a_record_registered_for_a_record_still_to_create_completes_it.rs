@@ -33,6 +33,10 @@ struct Register {
 }
 
 fn input() -> UnderstandingInput {
+    saying("register the new traveler")
+}
+
+fn saying(message: &str) -> UnderstandingInput {
     let trips = WorkflowBrief::new("trip").on_new_case(OPEN_TRIP).operation(
         OperationSpec::new(OPEN_TRIP)
             .summary("Start a new trip, for its traveler when named.")
@@ -58,7 +62,7 @@ fn input() -> UnderstandingInput {
         }),
         excerpt: None,
     };
-    UnderstandingInput::new("register the new traveler", "en-GB", today())
+    UnderstandingInput::new(message, "en-GB", today())
         .with_workflow(trips)
         .with_workflow(travelers)
         .with_expectation(Expectation::Values(PendingAct {
@@ -147,6 +151,51 @@ async fn the_name_stays_when_the_whole_turn_check_reads_the_record_again() {
     assert_eq!(
         register.arguments.get("full_name").map(|a| &a.value),
         Some(&ArgumentValue::Json("Ferri".into())),
+        "{acts:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_answer_routed_to_the_record_still_to_create_creates_it() {
+    // [1]Nadia [2]Rinaldi
+    let script = script()
+        .answer(
+            "turn/segment",
+            json!({"analysis": "The asked value.", "units": [
+                {"kind": "provides_value", "words": {"from": 1, "to": 2}}
+            ]}),
+        )
+        .answer("u1/route", json!({"operations": [REGISTER, OPEN_TRIP]}))
+        .answer(
+            "u1/extract",
+            json!({"arguments": {"full_name": {"kind": "words", "text": "Nadia Rinaldi",
+                   "message": "current", "from": 1, "to": 2}}}),
+        )
+        .answer(
+            "u1.a2/extract",
+            json!({"arguments": {"traveler": {"kind": "record", "record": "s1", "name": "",
+                   "message": "current", "from": 1, "to": 2}}}),
+        )
+        .answer(
+            "u1/verify",
+            json!({"reason": "Given.", "arguments": {"full_name": "stated"}, "overall": "confirmed"}),
+        )
+        .answer(
+            "u1.a2/verify",
+            json!({"reason": "Given.", "arguments": {"traveler": "stated"}, "overall": "confirmed"}),
+        );
+    let run = understand(script, &saying("Nadia Rinaldi")).await;
+
+    let acts = &run.understanding.acts;
+    let trip = acts
+        .iter()
+        .find(|act| act.operation().is_some_and(|op| op.as_str() == OPEN_TRIP))
+        .unwrap_or_else(|| panic!("the trip is created: {acts:?}"));
+    assert_eq!(
+        trip.target,
+        ActTarget::New {
+            workflow: "trip".into()
+        },
         "{acts:?}"
     );
 }

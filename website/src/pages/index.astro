@@ -103,7 +103,7 @@ let answer = orchestrator.handle_turn(input).await?;
 assert!(answer.receipts().all(|receipt| receipt.is_event_backed()));
 `;
 const cargoToml = `[dependencies]
-turnframe = { version = "0.1", features = ["openai", "postgres", "telemetry"] }
+turnframe = { version = "0.2", features = ["openai", "postgres", "telemetry"] }
 `;
 const shell = `cargo run -p travel-desk  # the four guarantees, scripted: no key needed
 cp .env.dev .env           # put a key in .env; the console loads it
@@ -202,8 +202,8 @@ cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; 
     </SiteSection>
 
     <SiteSection id="architecture" number="03" eyebrow="Frame data"
-      title="Nine small questions," turn="not one large prompt."
-      lead="A message goes through a fixed chain of narrow tasks, each with a strict schema and a check in code. Dates and amounts are computed by code from what the model points at. No task needs more than a few hundred tokens, so a small, cheap model can run a real workflow.">
+      title="Ten small questions," turn="not one large prompt."
+      lead="A message goes through a fixed chain of narrow tasks, each with a strict schema and a check in code, starting from what the last reply offered. Dates and amounts are computed by code from what the model points at. No task needs more than a few hundred tokens, so a small, cheap model can run a real workflow.">
       <PipelineRail />
       <p class="home-more"><a href="/docs/architecture">The turn pipeline, step by step <Icon name="arrow" /></a></p>
     </SiteSection>

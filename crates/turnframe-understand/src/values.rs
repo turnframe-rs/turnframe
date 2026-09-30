@@ -3,7 +3,8 @@
 
 use std::collections::BTreeMap;
 
-use turnframe_core::operation::{Money, ValueShape};
+use chrono::Datelike as _;
+use turnframe_core::operation::{DateExpr, Money, ValueShape};
 use turnframe_core::understanding::{
     ArgumentValue, Excerpt, MessageRef, RecordValue, UnderstoodArgument,
 };
@@ -24,6 +25,8 @@ pub struct Extracted {
     /// Of those, the ones pointed at in words another part of the message holds, with
     /// those words: that part's value, which this act may still find elsewhere.
     pub elsewhere: Vec<(String, Span)>,
+    /// Their values, set aside: this act's again when no act of that part uses the words.
+    pub aside: BTreeMap<String, UnderstoodArgument>,
 }
 
 /// Turns `output` into values, or says what is structurally wrong with it.
@@ -172,6 +175,15 @@ fn converted(
         if message == CURRENT && elsewhere(input, span) && !chosen(input, given) && !by_name {
             extracted.not_given.push(name.clone());
             extracted.elsewhere.push((name.clone(), span));
+            if let Ok(value) = value_of(turn, input, name, &argument.shape, given, words, span) {
+                let excerpt = Some(Excerpt {
+                    message: reference,
+                    words: range,
+                });
+                extracted
+                    .aside
+                    .insert(name.clone(), UnderstoodArgument { value, excerpt });
+            }
             continue;
         }
         let value = value_of(turn, input, name, &argument.shape, given, words, span)?;
@@ -305,14 +317,49 @@ fn wrong_kind(name: &str, shape: &ValueShape) -> StructuralError {
     )
 }
 
-/// `text` without one pair of quotes around the whole of it.
+/// Whether `text` says `year`: its four digits, or its last two as a number of their own
+/// that is not the day.
+pub(crate) fn says_year(text: &str, year: i32, day: u32) -> bool {
+    let runs: Vec<&str> = text
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|run| !run.is_empty())
+        .collect();
+    let full = year.to_string();
+    let short = format!("{:02}", year.rem_euclid(100));
+    let shorts = runs.iter().filter(|run| **run == short).count();
+    let day_is_short = format!("{day:02}") == short || day.to_string() == short;
+    runs.iter().any(|run| *run == full) || shorts > usize::from(day_is_short)
+}
+
+/// Whether `word`, its last stop left out, is letters in short pieces between stops («S.r.l»).
+fn initialism(word: &str) -> bool {
+    let pieces: Vec<&str> = word.split('.').collect();
+    pieces.len() > 1
+        && pieces.iter().all(|piece| {
+            (1..=3).contains(&piece.chars().count()) && piece.chars().all(char::is_alphabetic)
+        })
+}
+
+/// `text` without a lone full stop after its last word: an initialism keeps its own.
+fn without_stop(text: &str) -> &str {
+    let last = text.split_whitespace().last().unwrap_or_default();
+    match last.strip_suffix('.') {
+        Some(word) if !word.ends_with('.') && !initialism(word) => &text[..text.len() - 1],
+        _ => text,
+    }
+}
+
+/// `text` without one pair of quotes around the whole of it, nor the mark ending the
+/// sentence after them, nor the sentence's own punctuation written inside them («"A,"»).
 fn unquoted(text: &str) -> &str {
     const PAIRS: [(char, char); 5] = [('"', '"'), ('\'', '\''), ('«', '»'), ('“', '”'), ('‘', '’')];
+    let bare = text.trim_end_matches(['.', '!', '?']);
     PAIRS
         .iter()
         .find_map(|(open, close)| {
-            let inner = text.strip_prefix(*open)?.strip_suffix(*close)?;
-            (!inner.trim().is_empty()).then(|| inner.trim())
+            let inner = bare.strip_prefix(*open)?.strip_suffix(*close)?;
+            let inner = without_stop(inner.trim().trim_end_matches([',', ';', ':'])).trim();
+            (!inner.is_empty()).then_some(inner)
         })
         .unwrap_or(text)
 }
@@ -342,6 +389,11 @@ fn value_of(
             if ends_sentence && !copied.trim().is_empty() && !copied.trim_end().ends_with(ends) {
                 text = text.trim_end_matches(ends);
             }
+            // A full stop after the last word ends the sentence: a value reads the same
+            // without it, and wrong with a stray one. An initialism keeps its own («S.r.l.»).
+            if ends_sentence {
+                text = without_stop(text);
+            }
             let text = unquoted(text);
             Ok(json(serde_json::Value::from(text)))
         }
@@ -370,6 +422,36 @@ fn value_of(
         }
         (ValueShape::Structured, Given::Value { value, .. }) => Ok(json(value.clone())),
         (ValueShape::Date { direction }, Given::Date { date, .. }) => {
+            // A year the words do not say is not the user's: the date has none.
+            let said = words.slice(span).unwrap_or_default();
+            let date = match date {
+                DateExpr::Absolute {
+                    year: Some(year),
+                    month,
+                    day,
+                } if !says_year(said, *year, *day) => &DateExpr::Absolute {
+                    year: None,
+                    month: *month,
+                    day: *day,
+                },
+                other => other,
+            };
+            // A correction keeps the year of the date it changes when it gives none.
+            let date = match (date, input.corrected.get(name)) {
+                (
+                    DateExpr::Absolute {
+                        year: None,
+                        month,
+                        day,
+                    },
+                    Some(before),
+                ) => DateExpr::Absolute {
+                    year: Some(before.year()),
+                    month: *month,
+                    day: *day,
+                },
+                _ => *date,
+            };
             let day = date.evaluate(turn.today, *direction).map_err(|error| {
                 StructuralError::new(
                     "no_such_date",

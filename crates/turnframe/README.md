@@ -32,7 +32,7 @@ never keeps a set of version numbers in step.
 
 ```toml
 [dependencies]
-turnframe = { version = "0.1", features = ["openai", "postgres", "telemetry"] }
+turnframe = { version = "0.2", features = ["openai", "postgres", "telemetry"] }
 ```
 
 > The model proposes meaning. Deterministic code decides effects. Committed

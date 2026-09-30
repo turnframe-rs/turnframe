@@ -1021,6 +1021,11 @@ var STAGES = [
       q: "Which units the message holds: requests, questions, values, corrections, chitchat.",
     },
     { id: "coverage", band: "propose", q: "Whether a request or a question was missed." },
+    {
+      id: "take_up",
+      band: "propose",
+      q: "Which offer of the last reply a request takes up, or whether it declines them.",
+    },
     { id: "route", band: "propose", q: "Which offered operation each request asks for, one act each." },
     { id: "locate", band: "propose", q: "Which record it is about, when more than one could be." },
     { id: "extract", band: "propose", q: "Each value, pointed at in the user\u2019s own words." },
@@ -2014,8 +2019,8 @@ var SPEC = [
     {
       n: "5",
       title: "Conversational quality",
-      what: "Tone varies with the model. The reply is reviewed before it is shown and cannot contradict a receipt.",
-      by: "Reply tasks, offline judges",
+      what: "Tone varies with the model. The reply is reviewed before it is shown and cannot contradict a receipt, and code makes it end on a way forward, offering only what the domain accepts now.",
+      by: "Reply tasks, progress checks, simulated users",
       soft: !0,
       tag: "Product-dependent",
     },

@@ -24,7 +24,10 @@ Code gathers the turn's outcome into one small document:
 - **disputes**: what the user said the assistant got wrong;
 - **starting**: a workflow the turn began without writing anything yet;
 - **ask**: the one thing to ask next, chosen by code;
-- **card**: the card on screen, by its title and buttons.
+- **card**: the card on screen, by its title and buttons: one the turn raised, else one an earlier
+  turn left open on a record the turn reached, which the reply points to;
+- **next**: what the user may do next, when the record owes nothing and no card is on screen;
+- **standing**: where the record of a question no fact answers stands.
 
 The ask is a receipt the user contested, else the first value an act is waiting for, else the first
 open obligation of the record the turn is on. A turn that reached no record is on the record its
@@ -38,9 +41,24 @@ sentence (`WorkflowDefinition::obligation_sentence`), which is also what the ser
 model writes the reply. A workflow that names the act answering an obligation
 (`WorkflowDefinition::obligation_act`: the operation, the values the obligation fixes, the values
 the answer gives) has it awaited as that act, so «the company» answers «an extra has no payer
-yet: who pays for it?» without the user naming the extra. A record that owes nothing more, with no card on
-screen, ends the reply on what its workflow says may come next (`WorkflowDefinition::next_steps`,
-each a sentence in the workflow's words); a workflow that says nothing ends on the acknowledgement.
+yet: who pays for it?» without the user naming the extra. An ask the last reply asked too, of the
+same record, with no refusal to explain it, says it is still needed to go on and offers the
+record's next steps beside it (`AskCopy::again`); a value asked again after a refusal gives the
+refusal as its reason.
+
+A record that owes nothing more, with no card on screen, ends the reply on what its workflow offers
+next (`WorkflowDefinition::next_steps`: each an operation, its words and the arguments already
+known). A step is offered only when the domain would take it now: its operation is on offer for
+the record and, when its arguments are complete, the act compiles and every command validates
+against the state (I22). The offers are recorded on the turn (`AssistantTurn::offers`) and the next
+message is read against them first, so «yes, do that» runs the offer on its record. A reply with
+nothing else to end on ends on the question to go on (`AskCopy::go_on`): every reply ends on a way
+forward (I21).
+
+A request only a record of a workflow can do, when none of its records exists, is not left unread:
+understanding is shown what such a record could do (`WorkflowDefinition::record_operations`), and
+a request for one that names no record is told there is none yet and offered to open one
+(`AskCopy::open_new`), an offer «yes» takes up like any other.
 
 A turn has one reply, the transition block, and it is the message the user reads: what was done,
 the answers to the questions, what the notices say, and the ask, in that order. The receipts,
@@ -61,8 +79,10 @@ read as the thing done, and a question's words get answered twice.
 A written acknowledgement is reviewed before it is shown. The review answers a yes-or-no checklist,
 and only the checks that apply are asked: whether the reply asks the ask and nothing else (when there
 is an ask), whether it states an action, a value or a promise the material does not hold, whether it
-contradicts the card on screen (when there is one), and whether it leaves out anything an answer or
-a notice says (when it gives any). A reply that fails is written once more with the review's
+contradicts the card on screen (when there is one), whether it offers every item next lists (when it
+lists anything and there is no ask), whether it ends on a question to go on (when nothing else is
+its way forward), and whether it leaves out anything an answer or a notice says (when it gives
+any). A reply that fails is written once more with the review's
 findings; one that fails again is dropped, and code's own words stand in for it: what was done, the
 answers, the notices, then the question. The review is part of
 the acknowledgement's profile and can be switched off where a stronger model makes it unnecessary.
@@ -76,7 +96,8 @@ facts of the records its question is about: which record and where it stands, wh
 it still needs, what can be done, and what a knowledge source returned. A question about records
 that names none is about the records in view. What the turn did is the acknowledgement's to say, so a refusal
 is said once. A question about what can be done is answered from the operations on offer, and when
-no model writes that answer, the server lists them itself.
+no model writes that answer, the server lists them itself. A question no fact answers is told
+where its record stands, what it holds and what it still needs, and never left at «I cannot tell».
 
 ## Languages
 

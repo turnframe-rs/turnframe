@@ -1677,7 +1677,7 @@ pub enum CorpusError {
 }
 
 impl CorpusError {
-    fn invalid(field: &str, reason: &str) -> Self {
+    pub(crate) fn invalid(field: &str, reason: &str) -> Self {
         Self::Invalid {
             field: field.to_owned(),
             reason: reason.to_owned(),

@@ -13,7 +13,7 @@ or, in `Cargo.toml`:
 
 ```toml
 [dependencies]
-turnframe = { version = "0.1", features = ["openai", "postgres", "telemetry"] }
+turnframe = { version = "0.2", features = ["openai", "postgres", "telemetry"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 

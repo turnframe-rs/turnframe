@@ -97,9 +97,10 @@ pub struct EffortProfile {
 
 /// The tasks that read the message, which `high` gives some reasoning. Not `extract`: on a mini
 /// model, reasoning made it copy the words naming a field into the value.
-const READING: [TaskKind; 8] = [
+const READING: [TaskKind; 9] = [
     TaskKind::Segment,
     TaskKind::Coverage,
+    TaskKind::TakeUp,
     TaskKind::Route,
     TaskKind::Locate,
     TaskKind::Verify,

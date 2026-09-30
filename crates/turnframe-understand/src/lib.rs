@@ -33,8 +33,8 @@ pub mod words;
 
 pub use check::{ActChecker, NoChecks};
 pub use input::{
-    CardOption, Expectation, OpenCard, PendingAct, PreviousReceipt, RecordBrief, Speaker,
-    TranscriptMessage, UnderstandingInput, WorkflowBrief,
+    CardOption, Expectation, OfferBrief, OpenCard, PendingAct, PreviousReceipt, RecordBrief,
+    Speaker, TranscriptMessage, UnderstandingInput, WorkflowBrief,
 };
 pub use pipeline::{Settings, TurnUnderstander, Understander, VerifyPolicy};
 pub use progress::{ChannelSteps, NoSteps, RecordedSteps, Step, StepSink};

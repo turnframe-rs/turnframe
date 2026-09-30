@@ -42,6 +42,9 @@ pub struct UnderstandingInput {
     pub settings: Option<crate::Settings>,
     /// Whether a knowledge source can answer a question about the domain in general.
     pub knowledge: bool,
+    /// The next steps the last reply offered, in order: a message is read first as taking
+    /// one up.
+    pub offers: Vec<OfferBrief>,
 }
 
 impl UnderstandingInput {
@@ -62,7 +65,15 @@ impl UnderstandingInput {
             last_subjects: Vec::new(),
             settings: None,
             knowledge: true,
+            offers: Vec::new(),
         }
+    }
+
+    /// Adds a next step the last reply offered.
+    #[must_use]
+    pub fn with_offer(mut self, offer: OfferBrief) -> Self {
+        self.offers.push(offer);
+        self
     }
 
     /// Says whether a knowledge source can answer a question about the domain in general;
@@ -449,6 +460,27 @@ impl Expectation {
         match self {
             Self::Values(pending) => pending.record.as_ref(),
             Self::Obligation { record, .. } => Some(record),
+        }
+    }
+}
+
+/// A next step the last reply offered: taken up, it is this act, on its record, with the
+/// values it already has; the words are those the reply offered it in.
+#[derive(Debug, Clone)]
+pub struct OfferBrief {
+    /// The words the reply offered it in.
+    pub words: String,
+    /// The act it runs.
+    pub act: PendingAct,
+}
+
+impl OfferBrief {
+    /// An offer of `act`, made in `words`.
+    #[must_use]
+    pub fn new(words: impl Into<String>, act: PendingAct) -> Self {
+        Self {
+            words: words.into(),
+            act,
         }
     }
 }

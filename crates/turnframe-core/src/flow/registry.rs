@@ -136,6 +136,10 @@ pub trait ErasedWorkflow: Send + Sync {
     fn noun(&self) -> Option<crate::locale::LocalizedText> {
         None
     }
+    /// Every operation a record may offer. See [`WorkflowDefinition::record_operations`].
+    fn record_operations(&self) -> Vec<OperationSpec> {
+        Vec::new()
+    }
 
     /// Guidance for understanding a turn about this case, as the workflow wrote it,
     /// untruncated: the deployment's [`BriefingBudget`](crate::flow::BriefingBudget)
@@ -220,9 +224,10 @@ pub trait ErasedWorkflow: Send + Sync {
     /// [`WorkflowDefinition::next_steps`].
     fn next_steps(
         &self,
-        view: &ErasedWorkflowView,
-    ) -> Result<Vec<crate::locale::LocalizedText>, ErasureError> {
-        let _ = view;
+        case_ref: CaseRef,
+        state: Option<&serde_json::Value>,
+    ) -> Result<Vec<super::NextStep>, ErasureError> {
+        let _ = (case_ref, state);
         Ok(Vec::new())
     }
 
@@ -262,6 +267,16 @@ pub trait ErasedWorkflow: Send + Sync {
         state: Option<&serde_json::Value>,
         command: &serde_json::Value,
     ) -> Result<(), ErasedCallError>;
+
+    /// The erased state an erased command leaves, when the workflow can tell.
+    fn state_after(
+        &self,
+        state: Option<&serde_json::Value>,
+        command: &serde_json::Value,
+    ) -> Result<Option<serde_json::Value>, ErasureError> {
+        let _ = (state, command);
+        Ok(None)
+    }
 
     /// Renders receipts from erased ledger events.
     ///
@@ -566,6 +581,10 @@ impl<W: WorkflowDefinition, E: Send + Sync> ErasedWorkflow for TypedWorkflowAdap
         self.definition.noun()
     }
 
+    fn record_operations(&self) -> Vec<OperationSpec> {
+        self.definition.record_operations()
+    }
+
     fn briefing(
         &self,
         case_ref: CaseRef,
@@ -636,10 +655,12 @@ impl<W: WorkflowDefinition, E: Send + Sync> ErasedWorkflow for TypedWorkflowAdap
 
     fn next_steps(
         &self,
-        view: &ErasedWorkflowView,
-    ) -> Result<Vec<crate::locale::LocalizedText>, ErasureError> {
-        let typed = self.typed_view_from(view)?;
-        Ok(self.definition.next_steps(&typed))
+        case_ref: CaseRef,
+        state: Option<&serde_json::Value>,
+    ) -> Result<Vec<super::NextStep>, ErasureError> {
+        let state = self.state(state)?;
+        let view = self.typed_view(case_ref, state.as_ref());
+        Ok(self.definition.next_steps(state.as_ref(), &view))
     }
 
     fn obligation_sentence(
@@ -704,6 +725,19 @@ impl<W: WorkflowDefinition, E: Send + Sync> ErasedWorkflow for TypedWorkflowAdap
         self.definition
             .validate_command(state.as_ref(), &command)
             .map_err(ErasedCallError::from)
+    }
+
+    fn state_after(
+        &self,
+        state: Option<&serde_json::Value>,
+        command: &serde_json::Value,
+    ) -> Result<Option<serde_json::Value>, ErasureError> {
+        let state = self.state(state)?;
+        let command = self.command(command)?;
+        self.definition
+            .state_after(state.as_ref(), &command)
+            .map(|next| self.serialize(&next))
+            .transpose()
     }
 
     fn receipts(

@@ -1,0 +1,52 @@
+id = "trip.nome_e_data.it"
+name = "A trip named and dated in Italian"
+want = "You write in Italian. You look after the trip «Trip 1» of Marta Bianchi. Name it «Offsite Lisbona», and set the day she would rather fly to 12 November 2026."
+manners = ["brief, informal Italian", "formal Italian, asks what is still missing before giving anything"]
+max_turns = 8
+locale = "it"
+
+[[setup.cases]]
+workflow = "trip"
+case_id = "trip-1"
+label = "Trip 1"
+revision = 3
+
+[setup.cases.state]
+status = "draft"
+
+[setup.cases.state.traveler]
+traveler_id = "5c1e0000-0000-4000-8000-000000000001"
+display_name = "Marta Bianchi"
+
+[[setup.cases.state.extras]]
+extra_id = "4cd2bc71-4b2e-87e2-a6a2-f7436f18babe"
+description = "Checked bag"
+quantity = 1
+unit_price_cents = 25000
+payer = "airline"
+
+[[setup.cases.state.legs]]
+number = 1
+flight = "AZ610"
+from = "FCO"
+to = "LIS"
+departs = "2026-10-05 07:40"
+status = "cancelled"
+
+[[setup.cases.state.legs]]
+number = 2
+flight = "AZ611"
+from = "LIS"
+to = "FCO"
+departs = "2026-10-09 18:20"
+status = "on_time"
+
+[[reached.case_state]]
+case_id = "trip-1"
+path = "/name"
+one_of = ["Offsite Lisbona", "offsite Lisbona"]
+
+[[reached.case_state]]
+case_id = "trip-1"
+path = "/travel_date"
+equals = "2026-11-12"

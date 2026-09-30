@@ -295,6 +295,7 @@ async fn drive(
         subjects: Vec::new(),
         expectations: Vec::new(),
         done: Vec::new(),
+        offers: Vec::new(),
     };
     claim_guard::verify(&turn).map_err(|v| v.to_string())?;
     let after = wf.definition.project(

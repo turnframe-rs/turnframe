@@ -16,7 +16,7 @@ use turnframe_core::event::{
     ArtifactRef, CommittedEvent, OperationalReceipt, ReceiptEvent, ReceiptSeverity, RedactedEvent,
 };
 use turnframe_core::flow::{
-    ConfirmationSubject, DomainEnumeration, EnumeratedValue, InteractionRequirement,
+    ConfirmationSubject, DomainEnumeration, EnumeratedValue, InteractionRequirement, NextStep,
     PhaseOwnership, StateField, ViewOf, WorkflowDefinition, WorkflowNotice, WorkflowView,
 };
 use turnframe_core::hash::canonical_digest;
@@ -145,6 +145,7 @@ impl TripWorkflow {
                         description: args.description,
                         quantity: args.quantity,
                         unit_price_cents: args.unit_price.minor,
+                        payer: args.payer,
                     },
                 }
             }
@@ -310,6 +311,20 @@ fn editing_operations() -> Vec<OperationSpec> {
                 .required()
                 .money()
         })
+        .argument("payer", |a| {
+            a.label("who pays")
+                .label_in("it-IT", "chi paga")
+                .describe("Who pays for it, when the message says so as it asks for the extra.")
+        })
+        .example(
+            "2 checked bags at 40 euros each, paid by the airline",
+            serde_json::json!({
+                "description": "checked bags",
+                "quantity": 2,
+                "unit_price": { "minor": 4000, "currency": "EUR" },
+                "payer": "airline"
+            }),
+        )
         .example(
             "40 euros for a checked bag",
             serde_json::json!({
@@ -328,7 +343,8 @@ fn editing_operations() -> Vec<OperationSpec> {
         ),
         operation(
             operations::ASSIGN_PAYER,
-            "Say who pays for one extra: the traveler, the company, or the airline.",
+            "Say who pays for one extra already on the trip: the traveler, the company, or the airline. \
+             An extra asked for with its payer is added with it.",
             existing,
         )
         .arguments::<AssignPayerArgs>()
@@ -686,6 +702,23 @@ impl WorkflowDefinition for TripWorkflow {
                 )),
             ));
         }
+        let rebooking = match state.status {
+            TripStatus::Draft => None,
+            TripStatus::AwaitingRebookingConfirmation => {
+                Some("quoted, waiting for the user to confirm it on the card")
+            }
+            TripStatus::Rebooking => {
+                Some("sent to the airline, not confirmed until the airline replies")
+            }
+            TripStatus::Ticketed => Some("confirmed by the airline, the new ticket issued"),
+            TripStatus::Refused => Some("refused by the airline; another can be asked for"),
+            TripStatus::Notified => Some("confirmed, and the traveler was sent the new ticket"),
+            TripStatus::NotNotified => Some("confirmed, but the traveler could not be reached"),
+            TripStatus::Withdrawn => Some("withdrawn before it was sent"),
+        };
+        if let Some(rebooking) = rebooking {
+            held.push(StateField::new("rebooking", serde_json::json!(rebooking)));
+        }
         held
     }
 
@@ -734,6 +767,10 @@ impl WorkflowDefinition for TripWorkflow {
         super::super::in_italian(Self::offered(view), ITALIAN)
     }
 
+    fn record_operations(&self) -> Vec<OperationSpec> {
+        super::super::in_italian(Self::every_record_operation(), ITALIAN)
+    }
+
     /// Guidance that changes with the phase: while a case is being filled in, what
     /// a kept leg means; once the rebooking card is up, to read the message as an
     /// answer to it.
@@ -776,6 +813,11 @@ impl WorkflowDefinition for TripWorkflow {
         match view.phase {
             TripPhase::Collecting => Some(String::from(
                 "Amounts on this trip are in whole cents; say them as currency.",
+            )),
+            TripPhase::Dispatching => Some(String::from(
+                "The rebooking was sent to the airline and is not confirmed until the airline \
+                 replies: nothing on the trip can be changed or confirmed meanwhile. Say so when \
+                 asked to act on it.",
             )),
             _ => None,
         }
@@ -836,14 +878,31 @@ impl WorkflowDefinition for TripWorkflow {
         ]
     }
 
-    /// A complete trip can take another extra; one still owing something offers nothing,
-    /// because what it owes is asked first. A step is offered only when the view shows it
-    /// can be done, so a rebooking, which needs a quote the view does not show, is not.
-    fn next_steps(&self, view: &ViewOf<Self>) -> Vec<LocalizedText> {
+    /// A complete trip can take another extra, and the rebooking of the quoted leg once a
+    /// quote is in; one still owing something offers nothing, because what it owes is asked
+    /// first. The runtime offers a step only when its dry run on the record passes.
+    fn next_steps(&self, state: Option<&TripState>, view: &ViewOf<Self>) -> Vec<NextStep> {
         if view.phase != TripPhase::Collecting || !view.obligations.is_empty() {
             return Vec::new();
         }
-        vec![LocalizedText::new("Add another extra.").with("it", "Aggiungere un altro extra.")]
+        let mut steps = vec![NextStep::new(
+            operations::ADD_EXTRA,
+            LocalizedText::new("Add another extra.").with("it", "Aggiungere un altro extra."),
+        )];
+        if let Some(offer) = state.and_then(|state| state.offer.as_ref()) {
+            steps.push(
+                NextStep::new(
+                    operations::REQUEST_REBOOKING,
+                    LocalizedText::new("Rebook the quoted flight: a card asks to confirm first.")
+                        .with(
+                            "it",
+                            "Cambiare il volo proposto: prima una scheda chiede conferma.",
+                        ),
+                )
+                .with_arguments(serde_json::json!({ "leg": offer.leg })),
+            );
+        }
+        steps
     }
 
     fn compile_act(
@@ -938,6 +997,12 @@ impl WorkflowDefinition for TripWorkflow {
         validate(state, command)
     }
 
+    fn state_after(&self, state: Option<&TripState>, command: &TripCommand) -> Option<TripState> {
+        super::apply::apply(state, command)
+            .ok()
+            .map(|applied| applied.state)
+    }
+
     fn receipts(
         &self,
         events: &[ReceiptEvent<TripEvent>],
@@ -975,24 +1040,43 @@ impl WorkflowDefinition for TripWorkflow {
 
 impl TripWorkflow {
     /// The operations a view offers, with their summaries in English.
-    fn offered(view: &ViewOf<Self>) -> Vec<OperationSpec> {
-        // Withdrawing takes only a record already in view: the sample's coverage of
-        // `RequiresCatalogedCase`.
-        let withdraw = operation(
+    /// Withdrawing takes only a record already in view: the sample's coverage of
+    /// `RequiresCatalogedCase`.
+    fn withdraw() -> OperationSpec {
+        operation(
             operations::WITHDRAW,
             "Withdraw the case before a rebooking is sent.",
             TargetPolicy::RequiresCatalogedCase,
-        );
-        let request_rebooking = leg_argument(operation(
+        )
+    }
+
+    fn request_rebooking() -> OperationSpec {
+        leg_argument(operation(
             operations::REQUEST_REBOOKING,
             "Show the rebooking card for the flight the airline quoted for a leg.",
             TargetPolicy::RequiresExistingCase,
-        ));
+        ))
+    }
+
+    /// What a trip may be asked to do in some phase, once it exists.
+    fn every_record_operation() -> Vec<OperationSpec> {
+        let mut every = editing_operations();
+        every.push(set_traveler());
+        every.push(Self::request_rebooking());
+        every.push(Self::withdraw());
+        every
+    }
+
+    fn offered(view: &ViewOf<Self>) -> Vec<OperationSpec> {
+        let withdraw = Self::withdraw();
+        let request_rebooking = Self::request_rebooking();
         match view.phase {
             TripPhase::PreDraft => vec![
                 operation(
                     operations::OPEN,
-                    "Open a new trip, the disruption case of one booking, for its traveler when named.",
+                    "Open a new trip, the disruption case of one booking, for its traveler when named. \
+                     Only for a trip not listed yet: opening, showing or going to a listed trip \
+                     asks nothing of it.",
                     TargetPolicy::NewCaseOnly,
                 )
                 .arguments::<OpenArgs>()
@@ -1052,7 +1136,9 @@ impl TripWorkflow {
 const ITALIAN: &[(&str, &str)] = &[
     (
         operations::OPEN,
-        "Apre un nuovo viaggio, la pratica di una prenotazione, per il viaggiatore se è nominato.",
+        "Apre un nuovo viaggio, la pratica di una prenotazione, per il viaggiatore se è nominato. \
+         Solo per un viaggio non ancora in elenco: aprire, mostrare o andare a un viaggio in \
+         elenco non gli chiede nulla.",
     ),
     (
         operations::SET_NAME,
@@ -1068,7 +1154,8 @@ const ITALIAN: &[(&str, &str)] = &[
     ),
     (
         operations::ASSIGN_PAYER,
-        "Dice chi paga un extra: il viaggiatore, l'azienda o la compagnia aerea.",
+        "Dice chi paga un extra già nel viaggio: il viaggiatore, l'azienda o la compagnia aerea. \
+         Un extra chiesto con chi lo paga si aggiunge già così.",
     ),
     (
         operations::CHANGE_EXTRA,
@@ -1170,22 +1257,32 @@ fn receipt_copy(event: &TripEvent) -> (ReceiptSeverity, LocalizedText, Localized
             description,
             quantity,
             unit_price_cents,
+            payer,
             ..
-        } => (
-            ReceiptSeverity::Success,
-            LocalizedText::new("Extra added").with("it", "Extra aggiunto"),
-            LocalizedText::new(format!(
-                "{quantity} x \"{description}\" at {} each.",
-                money(*unit_price_cents, "en")
-            ))
-            .with(
-                "it",
-                format!(
-                    "{quantity} x \"{description}\" a {} l'uno.",
-                    money(*unit_price_cents, "it")
+        } => {
+            let paid = |locale: &str, by: &str| {
+                payer.map_or_else(String::new, |payer| {
+                    format!("{by} {}", payer_name(payer, locale))
+                })
+            };
+            (
+                ReceiptSeverity::Success,
+                LocalizedText::new("Extra added").with("it", "Extra aggiunto"),
+                LocalizedText::new(format!(
+                    "{quantity} x \"{description}\" at {} each{}.",
+                    money(*unit_price_cents, "en"),
+                    paid("en", ", paid by")
+                ))
+                .with(
+                    "it",
+                    format!(
+                        "{quantity} x \"{description}\" a {} l'uno{}.",
+                        money(*unit_price_cents, "it"),
+                        paid("it", ", pagato da")
+                    ),
                 ),
-            ),
-        ),
+            )
+        }
         TripEvent::PayerAssigned { payer, .. } => (
             ReceiptSeverity::Success,
             LocalizedText::new("Payer set").with("it", "Pagante impostato"),
@@ -1362,6 +1459,7 @@ mod tests {
     #[test]
     fn an_extra_receipt_shows_its_price_as_money() {
         let event = TripEvent::ExtraAdded {
+            payer: None,
             extra_id: Uuid::nil(),
             description: "bags".to_owned(),
             quantity: 2,

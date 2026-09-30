@@ -35,6 +35,10 @@ use turnframe_eval::corpus::EvalItem;
 use turnframe_eval::runner::{EvalHarness, HarnessError, PreparedRun, SampleIndex};
 use turnframe_provider::provider::ModelProvider;
 use turnframe_provider::router::ProviderPool;
+use turnframe_provider::secret::ApiKey;
+use turnframe_provider_anthropic::AnthropicProvider;
+use turnframe_provider_gemini::GeminiProvider;
+use turnframe_provider_openai::OpenAiProvider;
 use turnframe_runtime::config::OrchestratorConfig;
 use turnframe_runtime::orchestrator::{CaseCandidate, FixedTurnClock, Orchestrator};
 use turnframe_runtime::resolve::{AuthorizedCase, TargetResolver};
@@ -213,6 +217,7 @@ pub struct SampleHarness {
     config: OrchestratorConfig,
     prior_events: usize,
     gauge: Option<Arc<ConcurrencyGauge>>,
+    at: DateTime<Utc>,
 }
 
 impl SampleHarness {
@@ -245,7 +250,16 @@ impl SampleHarness {
             config: OrchestratorConfig::conservative(),
             prior_events: 0,
             gauge: None,
+            at: now(),
         }
+    }
+
+    /// Runs every turn at `instant`, which a turn reads as today: the fixed [`now`] when
+    /// unset, the one the corpus is written against.
+    #[must_use]
+    pub const fn at(mut self, instant: DateTime<Utc>) -> Self {
+        self.at = instant;
+        self
     }
 
     /// Gives every seeded case `count` events of history before the turn runs.
@@ -293,7 +307,7 @@ impl EvalHarness for SampleHarness {
         item: &EvalItem,
         sample: SampleIndex,
     ) -> Result<PreparedRun, HarnessError> {
-        let stores = FakeStores::at(now());
+        let stores = FakeStores::at(self.at);
         let trip = Arc::new(InMemoryExecutor::new(TripWorkflow::default()));
         let traveler = Arc::new(InMemoryExecutor::new(TravelerWorkflow::default()));
         let claim = Arc::new(InMemoryExecutor::new(ClaimWorkflow::default()));
@@ -384,7 +398,7 @@ impl EvalHarness for SampleHarness {
                 travelers: Arc::clone(&traveler),
             }))
             .policy(PolicySnapshot::conservative())
-            .clock(Arc::new(FixedTurnClock(now())))
+            .clock(Arc::new(FixedTurnClock(self.at)))
             .config(self.config.clone());
         if let Some(understander) = understander {
             builder = builder.understander(understander);
@@ -403,15 +417,23 @@ impl EvalHarness for SampleHarness {
             .create_conversation(turnframe_store::conversation::ConversationRecord::new(
                 conversation_id,
                 account.clone(),
-                now(),
+                self.at,
             ))
             .await
             .map_err(|error| HarnessError::setup(error.to_string()))?;
 
-        seed_history(&stores, &account, conversation_id, item).await?;
+        seed_history(&stores, &account, conversation_id, item, self.at).await?;
         for seed in &item.setup.cases {
-            seed_blocking_card(&stores, &workflows, &account, conversation_id, seed).await?;
-            seed_prior_events(&stores, &account, seed, self.prior_events).await?;
+            seed_blocking_card(
+                &stores,
+                &workflows,
+                &account,
+                conversation_id,
+                seed,
+                self.at,
+            )
+            .await?;
+            seed_prior_events(&stores, &account, seed, self.prior_events, self.at).await?;
         }
 
         if let Some(gauge) = &self.gauge {
@@ -455,6 +477,7 @@ async fn seed_prior_events(
     account: &AccountId,
     seed: &turnframe_eval::corpus::CaseSeed,
     count: usize,
+    at: DateTime<Utc>,
 ) -> Result<(), HarnessError> {
     if count == 0 {
         return Ok(());
@@ -470,7 +493,7 @@ async fn seed_prior_events(
             .map(|index| CommittedEvent {
                 event_id: EventId::new(),
                 event_type: "trip.note_added".to_owned(),
-                occurred_at: now(),
+                occurred_at: at,
                 payload: serde_json::json!({"index": index}),
             })
             .collect();
@@ -509,6 +532,7 @@ async fn seed_blocking_card(
     account: &AccountId,
     conversation_id: ConversationId,
     seed: &turnframe_eval::corpus::CaseSeed,
+    at: DateTime<Utc>,
 ) -> Result<(), HarnessError> {
     let registered =
         workflows
@@ -538,7 +562,7 @@ async fn seed_blocking_card(
         account.clone(),
         conversation_id,
         TurnId::nil(),
-        now(),
+        at,
     )
     .map_err(|error| HarnessError::setup(error.to_string()))?;
     stores
@@ -556,13 +580,14 @@ async fn seed_history(
     account: &AccountId,
     conversation_id: ConversationId,
     item: &EvalItem,
+    at: DateTime<Utc>,
 ) -> Result<(), HarnessError> {
     let conversations = stores.stores().conversations();
     let count = item.setup.history.len();
     for (index, exchange) in item.setup.history.iter().enumerate() {
         let turn_id = TurnId::from(uuid::Uuid::from_u128(0xFFFF_0000 + index as u128));
         let minutes_ago = i64::try_from(count - index).unwrap_or(i64::MAX);
-        let received_at = now() - chrono::TimeDelta::minutes(minutes_ago);
+        let received_at = at - chrono::TimeDelta::minutes(minutes_ago);
         let input = turnframe_core::turn::TurnInput {
             turn_id,
             conversation_id,
@@ -609,6 +634,7 @@ async fn seed_history(
                     subjects: Vec::new(),
                     expectations: Vec::new(),
                     done: Vec::new(),
+                    offers: Vec::new(),
                 },
             )
             .await
@@ -704,4 +730,52 @@ impl turnframe_runtime::orchestrator::CaseDirectory for Records {
             })
             .collect())
     }
+}
+
+/// The three adapters this can run against, with the model each falls back to.
+///
+/// The defaults are small, cheap and current: the point is to exercise the
+/// pipeline end to end against a real model, not to benchmark a frontier one.
+pub const VENDORS: [(&str, &str); 3] = [
+    ("openai", "gpt-4o-mini"),
+    ("anthropic", "claude-haiku-4-5-20251001"),
+    ("gemini", "gemini-2.5-flash"),
+];
+
+/// The vendor used when the caller names none.
+pub const DEFAULT_VENDOR: &str = "openai";
+
+/// Builds the provider for `vendor`, or `None` when the name is not one of the
+/// three.
+pub fn provider_for(vendor: &str, model: &str, key: &ApiKey) -> Option<Arc<dyn ModelProvider>> {
+    match vendor {
+        "openai" => OpenAiProvider::openai()
+            .api_key(key.clone())
+            .model(model)
+            .build()
+            .ok()
+            .map(|built| Arc::new(built) as Arc<dyn ModelProvider>),
+        "anthropic" => AnthropicProvider::anthropic()
+            .api_key(key.clone())
+            .model(model)
+            .build()
+            .ok()
+            .map(|built| Arc::new(built) as Arc<dyn ModelProvider>),
+        "gemini" => GeminiProvider::gemini()
+            .api_key(key.clone())
+            .model(model)
+            .build()
+            .ok()
+            .map(|built| Arc::new(built) as Arc<dyn ModelProvider>),
+        _ => None,
+    }
+}
+
+/// Loads the repository's `.env` once per test binary, before any test reads a
+/// variable or opens a connection. A variable already set in the shell wins.
+pub fn load_dotenv() {
+    static LOADED: std::sync::Once = std::sync::Once::new();
+    LOADED.call_once(|| {
+        let _ = dotenvy::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/../../.env"));
+    });
 }

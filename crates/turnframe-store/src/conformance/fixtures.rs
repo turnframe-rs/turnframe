@@ -305,6 +305,7 @@ pub(super) fn assistant_turn(
         expectations: Vec::new(),
         replay_token: ReplayToken::new("conformance-replay-token"),
         done: Vec::new(),
+        offers: Vec::new(),
     }
 }
 

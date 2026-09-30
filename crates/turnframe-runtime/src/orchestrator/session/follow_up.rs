@@ -17,6 +17,9 @@ use crate::interactions::PersistedInteractions;
 
 type Standing = (CaseRef, Option<serde_json::Value>, ErasedWorkflowView);
 
+/// The state of each case the answer stands on, after the turn's commit.
+pub(super) type States = std::collections::BTreeMap<CaseKey, Option<serde_json::Value>>;
+
 impl Session<'_> {
     /// The views the answer is written from, the cards the standing cases require,
     /// and whether a case the turn touched could not be read back.
@@ -29,7 +32,7 @@ impl Session<'_> {
         &mut self,
         execution: &ExecutionReport,
         plan: &ReductionPlan,
-    ) -> (Vec<ErasedWorkflowView>, PersistedInteractions, bool) {
+    ) -> (Vec<ErasedWorkflowView>, States, PersistedInteractions, bool) {
         let attempted: BTreeSet<CaseKey> = execution
             .changed
             .keys()
@@ -96,10 +99,14 @@ impl Session<'_> {
                 self.now,
             )
             .await;
+        let states: States = standing
+            .iter()
+            .map(|(case_ref, state, _)| (case_ref.key(), state.clone()))
+            .collect();
         let mut views: Vec<ErasedWorkflowView> =
             standing.into_iter().map(|(_, _, view)| view).collect();
         views.extend(self.projected_but_absent(plan, &attempted, &views));
-        (views, persisted, refresh_unavailable)
+        (views, states, persisted, refresh_unavailable)
     }
 
     /// The projection of a case an act reached that does not exist yet: a start the

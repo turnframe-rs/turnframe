@@ -299,8 +299,14 @@ impl Session<'_> {
         if !unborn && !self.context.views.contains_key(&case_ref.key()) {
             return Err(ReductionError::CaseNotLoaded { act: act.id });
         }
-        let state = if unborn {
+        // A case the turn opens stands as the earlier acts on it leave it.
+        let planned = if unborn {
+            self.unborn.get(&case_ref.key()).cloned()
+        } else {
             None
+        };
+        let state = if unborn {
+            planned.as_ref()
         } else {
             reducer.states.get(&case_ref.key())
         };
@@ -353,7 +359,29 @@ impl Session<'_> {
             return Ok(());
         }
         self.command_count += commands.len();
-        self.police(index, case_ref, definition, state, &commands, &resolved)
+        self.police(index, case_ref, definition, state, &commands, &resolved)?;
+        if unborn
+            && matches!(
+                self.results[index],
+                Some(PlannedActResult::ReadyToExecute { .. })
+            )
+        {
+            let mut after = state.cloned();
+            for command in &commands {
+                after = definition
+                    .state_after(after.as_ref(), command)
+                    .ok()
+                    .flatten();
+                if after.is_none() {
+                    break;
+                }
+            }
+            match after {
+                Some(after) => self.unborn.insert(case_ref.key(), after),
+                None => self.unborn.remove(&case_ref.key()),
+            };
+        }
+        Ok(())
     }
 }
 

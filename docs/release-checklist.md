@@ -27,8 +27,8 @@ The evaluation gate is met by a corpus that runs against real endpoints, not onl
 provider: a scripted run measures the fixture, since its assertions pass because the script was
 written to make them pass. The live corpus holds 76 items in English and Italian, each checked by
 deterministic assertions and, where it says so, task by task. The latest figures and their limits
-are in [benchmarks](benchmarks.md): on OpenAI's `gpt-5.4-mini` at `medium`, 228 of 228 samples
-pass, three samples per item. Re-run it as [evaluation](evaluation.md) describes.
+are in [benchmarks](benchmarks.md): on OpenAI's `gpt-5.4-mini` at `medium`, the latest whole run
+passed 227 of 228 samples, three samples per item. Re-run it as [evaluation](evaluation.md) describes.
 
 Two things the live runs taught are now part of the contract. A schema is rewritten into each
 provider's dialect, narrowing only and refusing what it cannot carry, and each adapter has a live

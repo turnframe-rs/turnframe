@@ -766,6 +766,7 @@ mod tests {
             expectations: Vec::new(),
             replay_token: ReplayToken::new("t"),
             done: Vec::new(),
+            offers: Vec::new(),
         };
         store
             .fail_next(

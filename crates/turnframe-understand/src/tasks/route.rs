@@ -27,13 +27,21 @@ const BUILT_IN: &str = include_str!("../../prompts/understand/route.md");
 #[derive(Debug, Clone, Copy)]
 pub struct Route<'a> {
     turn: &'a UnderstandingInput,
+    again: bool,
 }
 
 impl<'a> Route<'a> {
     /// The task for `turn`.
     #[must_use]
     pub const fn new(turn: &'a UnderstandingInput) -> Self {
-        Self { turn }
+        Self { turn, again: false }
+    }
+
+    /// The task routing a part a second time, told why its first reading is in doubt: there,
+    /// readings that find no operation may make a majority, and doing nothing wins the doubt.
+    #[must_use]
+    pub const fn again(turn: &'a UnderstandingInput) -> Self {
+        Self { turn, again: true }
     }
 }
 
@@ -106,10 +114,10 @@ impl<'a> ModelTask for Route<'a> {
     type Input = RouteInput<'a>;
     type Output = Routing;
 
-    /// Readings that find no operation never make a majority: a split with one that finds one
-    /// is read once more, shown them all.
+    /// Readings that find no operation never make a majority, save on a second reading: a
+    /// split with one that finds one is read once more, shown them all.
     fn agree(&self, left: &Routing, right: &Routing) -> bool {
-        left == right && left.operations.iter().all(|operation| operation != NONE)
+        left == right && (self.again || left.operations.iter().all(|operation| operation != NONE))
     }
 
     fn kind(&self) -> TaskKind {
@@ -231,6 +239,17 @@ mod tests {
         assert!(!route.agree(&reading(&[NONE]), &reading(&[NONE])));
         assert!(route.agree(&reading(&["trip.set_name"]), &reading(&["trip.set_name"])));
         assert!(!route.agree(&reading(&["trip.set_name"]), &reading(&[NONE])));
+    }
+
+    #[test]
+    fn a_second_reading_that_finds_no_operation_may_make_a_majority() {
+        let turn = UnderstandingInput::new("open A", "en-GB", chrono::NaiveDate::MIN);
+        let route = Route::again(&turn);
+        let reading = |ops: &[&str]| Routing {
+            operations: ops.iter().map(|op| (*op).to_owned()).collect(),
+        };
+        assert!(route.agree(&reading(&[NONE]), &reading(&[NONE])));
+        assert!(!route.agree(&reading(&["trip.open"]), &reading(&[NONE])));
     }
 
     fn rendered(label: &'static str) -> String {

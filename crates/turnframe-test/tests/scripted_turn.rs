@@ -224,6 +224,7 @@ async fn execution(executor: &TripExecutor, command: TripCommand) -> TurnExecuti
         expectations: Vec::new(),
         replay_token: ReplayToken::from("replay-1"),
         done: Vec::new(),
+        offers: Vec::new(),
     };
     TurnExecution::new(record, response)
 }

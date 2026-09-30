@@ -961,7 +961,7 @@ body {
 }
 
 /* ── The pipeline strip ───────────────────────── */
-/* Nine columns need the full width: below it the strip takes the two-column form. */
+/* Ten columns need the full width: below it the strip takes the two-column form. */
 @media (max-width: 1280px) {
   .tf-pipe {
     grid-template-columns: minmax(0, 1fr);

@@ -1,6 +1,6 @@
 {
   "recorded_with": "cargo run -p refund-desk -- --record website/src/data/refund-runs.json",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "orders": [
     {
       "label": "Order 381",
