@@ -184,6 +184,8 @@ pub(crate) struct SharedPlanning {
     pub(crate) clock: Arc<dyn TurnClock>,
     pub(crate) case_ids: Arc<dyn CaseIdFactory>,
     pub(crate) observer: Arc<dyn Observer>,
+    /// Whether a knowledge source can answer a question about the domain in general.
+    pub(crate) knowledge: bool,
 }
 
 impl TurnPlanner {
@@ -604,6 +606,7 @@ async fn plan_with(
             typed_answers_allowed: shared.policy.allow_text_resolution_for_low_risk,
             config: &shared.config.understanding,
             effort: &effort,
+            knowledge: shared.knowledge,
         },
         &operations,
         &NoSteps,
@@ -880,6 +883,8 @@ impl SharedBuilder {
             clock: self.clock,
             case_ids: self.case_ids,
             observer: self.observer,
+            // A planner alone answers nothing: it frames questions as a turn with a source.
+            knowledge: true,
         })
     }
 }

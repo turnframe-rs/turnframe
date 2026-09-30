@@ -5,6 +5,43 @@ All notable changes to Turnframe are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2]
+
+Published: `turnframe-understand`, `turnframe-runtime`, `turnframe-test` and the `turnframe`
+facade at 0.1.2. Every other crate stays at 0.1.0. The facade asks for the three at 0.1.2.
+
+### Changed
+
+**`turnframe-runtime`**
+
+- Every reply the runtime writes ends on a way forward: the ask, the card on screen, the next
+  steps, or a question to go on (`AskCopy::go_on`, «What would you like to do next?»). A reply of
+  answers alone, or of nothing, ends on it; the reply code writes when the writer's is refused
+  says what was not done and ends on the ask or the next steps; the writer is told to end on it,
+  and its review checks that it does.
+- A question is not read as asking for general knowledge when no knowledge source is configured,
+  so it is answered from what the records hold and what can be done, never with «the sources were
+  not available».
+
+**`turnframe-understand`**
+
+- A value the message itself holds is taken from the message, even when the reading points at an
+  earlier message holding the same words: a correction no longer reverts to the value it corrects.
+- Small talk read again because a check read an act in it stands when the second reading finds
+  nothing on offer for it: nothing is reported as not understood.
+- `UnderstandingInput::knowledge` and `with_knowledge`: whether a knowledge source can answer a
+  question about the domain in general.
+
+**`turnframe-test`**
+
+- The trip sample offers as next steps only what its view shows can be done: another extra, and no
+  longer a rebooking it cannot know is quoted. The scripted passing review answers the new checks.
+
+**Examples**
+
+- The console prints a card that asks without blocking, such as which record was meant, with its
+  numbered options, and a number answers it.
+
 ## [0.1.1]
 
 Published: `turnframe-understand`, `turnframe-runtime`, `turnframe-test` and the `turnframe`

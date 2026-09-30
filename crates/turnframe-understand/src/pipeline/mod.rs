@@ -291,7 +291,7 @@ impl Understander {
         // when the settings ask, sends the segmentation back once, told what coverage saw.
         // A constraint still lost after that fails the turn closed.
         let mut lost: Option<(Segmentation, units::Retry)> = None;
-        let (mut units, routes, mut questions) = loop {
+        let (mut units, mut routes, mut questions) = loop {
             let reread = settings.reread_small_talk && lost.is_none();
             match self.read(scope, turn, steps, lost.as_ref(), reread).await {
                 Ok(read) => break read,
@@ -306,6 +306,9 @@ impl Understander {
                 }
             }
         };
+        if let Some((first, units::Retry::Disputed { dispute: false, .. })) = &lost {
+            small_talk_stands(first, &mut units, &mut routes);
+        }
         let mut planning = plan(turn, &units, &routes);
         for item in &planning.not_understood {
             steps.step(Step::NotUnderstood {
@@ -1761,6 +1764,35 @@ fn copies_keep_to_their_words(turn: &UnderstandingInput, chained: &mut [Chained]
         }
         excerpt.words = range;
         argument.value = ArgumentValue::Json(text.into());
+    }
+}
+
+/// Words the first reading took as small talk, read again because a check read an act in
+/// them: a part the second reading made of them that no operation on offer does found
+/// nothing to do either, so it stays small talk and nothing is reported as not understood.
+fn small_talk_stands(
+    first: &Segmentation,
+    units: &mut [Seg],
+    routes: &mut BTreeMap<UnitId, Vec<Routed>>,
+) {
+    let talk: Vec<crate::words::Span> = first
+        .units
+        .iter()
+        .filter(|unit| matches!(unit, SegmentedUnit::Chitchat { .. }))
+        .map(SegmentedUnit::words)
+        .collect();
+    for unit in units.iter_mut() {
+        let inside = talk
+            .iter()
+            .any(|said| said.from <= unit.span.from && unit.span.to <= said.to);
+        let nothing = matches!(
+            routes.get(&unit.id).map(Vec::as_slice),
+            Some([Routed::Nothing(NotUnderstoodReason::NoOperation)])
+        );
+        if inside && nothing {
+            unit.unit = SegmentedUnit::Chitchat { words: unit.span };
+            routes.remove(&unit.id);
+        }
     }
 }
 

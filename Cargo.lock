@@ -3639,7 +3639,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "turnframe"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3876,7 +3876,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-runtime"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3970,7 +3970,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-test"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3995,7 +3995,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-understand"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "chrono",

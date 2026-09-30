@@ -330,6 +330,11 @@ impl Composer {
             .is_ok()
     }
 
+    /// Whether a knowledge source is configured to answer questions about the domain.
+    pub(crate) const fn has_knowledge(&self) -> bool {
+        self.knowledge.is_some()
+    }
+
     /// Attaches a knowledge provider (spec §19.2).
     #[must_use]
     pub fn with_knowledge(mut self, knowledge: Arc<dyn KnowledgeProvider>) -> Self {
@@ -580,7 +585,13 @@ impl Composer {
             // The turn's one reply: the answers alone as written, else a reply that gives
             // what was done, the answers, the notices and the ask.
             let reply = if only_answers {
-                (!answer_texts.is_empty()).then(|| answer_texts.join("\n\n"))
+                // Answers alone, or nothing: the question to go on closes the reply.
+                let parts: Vec<String> = answer_texts
+                    .iter()
+                    .cloned()
+                    .chain(outcome.closing.clone())
+                    .collect();
+                (!parts.is_empty()).then(|| parts.join("\n\n"))
             } else if let Some(text) = self
                 .acknowledge(
                     &input,
@@ -597,7 +608,8 @@ impl Composer {
                 asked = outcome.ask.is_some();
                 Some(text)
             } else {
-                // Code's own words stand in for a reply that failed, in the reply's order.
+                // Code's own words stand in for a reply that failed, in the reply's order,
+                // and end on the way forward, as every reply does.
                 let done: Vec<&str> = receipts
                     .iter()
                     .map(|receipt| receipt.body.resolve(locale))
@@ -606,11 +618,19 @@ impl Composer {
                 if !done.is_empty() {
                     parts.push(done.join(" "));
                 }
+                if !outcome.not_done.is_empty() {
+                    parts.push(outcome.not_done.join(" "));
+                }
                 parts.extend(answered.iter().map(|answer| answer.text.clone()));
                 parts.extend(notice_texts);
                 if let Some(ask) = &outcome.ask {
                     asked = true;
                     parts.push(ask.question.clone());
+                } else if !outcome.next.is_empty() {
+                    let go_on = self.ask_copy.go_on.resolve(locale);
+                    parts.push(format!("{go_on} {}", outcome.next.join(" ")));
+                } else if let Some(closing) = &outcome.closing {
+                    parts.push(closing.clone());
                 }
                 (!parts.is_empty()).then(|| parts.join("\n\n"))
             };

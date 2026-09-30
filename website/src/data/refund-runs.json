@@ -530,6 +530,11 @@
           "kind": "reply",
           "text": "Yes: order 381 was delivered on 18 September, and its refund window is open until 18 October.",
           "scripted": true
+        },
+        {
+          "station": "ledger",
+          "kind": "reply",
+          "text": "What would you like to do next?"
         }
       ]
     },

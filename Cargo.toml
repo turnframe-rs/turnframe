@@ -42,7 +42,7 @@ categories = ["asynchronous", "api-bindings"]
 # Intra-workspace crates
 turnframe                    = { path = "crates/turnframe", version = "0.1.0" }
 turnframe-core               = { path = "crates/turnframe-core", version = "0.1.0" }
-turnframe-runtime            = { path = "crates/turnframe-runtime", version = "0.1.1" }
+turnframe-runtime            = { path = "crates/turnframe-runtime", version = "0.1.2" }
 turnframe-macros             = { path = "crates/turnframe-macros", version = "0.1.0" }
 turnframe-store              = { path = "crates/turnframe-store", version = "0.1.0" }
 turnframe-store-postgres     = { path = "crates/turnframe-store-postgres", version = "0.1.0" }
@@ -54,10 +54,10 @@ turnframe-provider-gemini    = { path = "crates/turnframe-provider-gemini", vers
 turnframe-provider-bedrock   = { path = "crates/turnframe-provider-bedrock", version = "0.1.0" }
 turnframe-provider-ollama    = { path = "crates/turnframe-provider-ollama", version = "0.1.0" }
 turnframe-eval               = { path = "crates/turnframe-eval", version = "0.1.0" }
-turnframe-test               = { path = "crates/turnframe-test", version = "0.1.1" }
+turnframe-test               = { path = "crates/turnframe-test", version = "0.1.2" }
 turnframe-telemetry          = { path = "crates/turnframe-telemetry", version = "0.1.0" }
 turnframe-tasks              = { path = "crates/turnframe-tasks", version = "0.1.0" }
-turnframe-understand         = { path = "crates/turnframe-understand", version = "0.1.1" }
+turnframe-understand         = { path = "crates/turnframe-understand", version = "0.1.2" }
 
 # Shared external dependencies
 async-trait        = "0.1"

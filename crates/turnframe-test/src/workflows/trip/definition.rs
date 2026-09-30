@@ -836,19 +836,14 @@ impl WorkflowDefinition for TripWorkflow {
         ]
     }
 
-    /// A complete trip can take another extra or be rebooked when a quote is in;
-    /// one still owing something offers nothing, because what it owes is asked first.
+    /// A complete trip can take another extra; one still owing something offers nothing,
+    /// because what it owes is asked first. A step is offered only when the view shows it
+    /// can be done, so a rebooking, which needs a quote the view does not show, is not.
     fn next_steps(&self, view: &ViewOf<Self>) -> Vec<LocalizedText> {
         if view.phase != TripPhase::Collecting || !view.obligations.is_empty() {
             return Vec::new();
         }
-        vec![
-            LocalizedText::new("Add another extra.").with("it", "Aggiungere un altro extra."),
-            LocalizedText::new("Rebook the quoted flight: a card asks to confirm first.").with(
-                "it",
-                "Cambiare il volo proposto: prima una scheda chiede conferma.",
-            ),
-        ]
+        vec![LocalizedText::new("Add another extra.").with("it", "Aggiungere un altro extra.")]
     }
 
     fn compile_act(

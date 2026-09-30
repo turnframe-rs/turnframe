@@ -41,6 +41,15 @@ impl<'a> QuestionFrame<'a> {
     pub const fn new(turn: &'a UnderstandingInput) -> Self {
         Self { turn }
     }
+
+    /// The topics on offer: knowledge only where a source can answer it.
+    fn topics(&self) -> Vec<String> {
+        TOPICS
+            .iter()
+            .filter(|topic| self.turn.knowledge || **topic != "knowledge")
+            .map(|topic| (*topic).to_owned())
+            .collect()
+    }
 }
 
 /// One question and what it may be about.
@@ -120,7 +129,7 @@ impl<'a> ModelTask for QuestionFrame<'a> {
 
     fn schema(&self, input: &QuestionInput<'a>) -> Value {
         let mut properties = vec![
-            ("topic", one_of(TOPICS)),
+            ("topic", one_of(self.topics())),
             ("record", one_of(input.choices())),
         ];
         if !input.subjects.is_empty() {
@@ -167,13 +176,44 @@ impl<'a> ModelTask for QuestionFrame<'a> {
     }
 
     fn check(&self, input: &QuestionInput<'a>, output: &Framing) -> Result<(), StructuralError> {
-        let topics: Vec<String> = TOPICS.iter().map(|t| (*t).to_owned()).collect();
-        check_one_of("topic", &output.topic, &topics)?;
+        check_one_of("topic", &output.topic, &self.topics())?;
         check_one_of("record", &output.record, &input.choices())?;
         let subjects: Vec<String> = input.subjects.iter().map(|s| (*s).to_owned()).collect();
         for subject in &output.subjects {
             check_one_of("subjects", subject, &subjects)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn topics(turn: &UnderstandingInput) -> Vec<String> {
+        let input = QuestionInput {
+            words: Span::new(0, 1),
+            records: Vec::new(),
+            subjects: Vec::new(),
+        };
+        let schema = QuestionFrame::new(turn).schema(&input);
+        schema["properties"]["topic"]["enum"]
+            .as_array()
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(|value| value.as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn knowledge_is_offered_only_where_a_source_holds_some() {
+        let turn = UnderstandingInput::new("what is it?", "en-GB", chrono::NaiveDate::MIN);
+        assert!(topics(&turn).contains(&"knowledge".to_owned()));
+        let without = turn.with_knowledge(false);
+        assert!(!topics(&without).contains(&"knowledge".to_owned()));
+        assert!(topics(&without).contains(&"record_state".to_owned()));
     }
 }

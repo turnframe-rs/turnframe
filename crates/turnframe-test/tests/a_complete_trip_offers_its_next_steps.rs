@@ -1,5 +1,7 @@
-//! A trip that owes nothing more offers what comes next: another extra, or rebooking it.
-//! One still collecting offers nothing, because what it owes is asked first.
+//! A trip that owes nothing more offers what comes next, and only what its view shows
+//! can be done: another extra. A rebooking needs a quote the view does not show, so it is
+//! never offered as a next step. One still collecting offers nothing: what it owes is
+//! asked first.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use turnframe_core::case::CaseRef;
@@ -20,9 +22,8 @@ fn a_complete_trip_offers_its_next_steps() {
         .iter()
         .map(|step| step.resolve(&english).to_owned())
         .collect();
-    assert_eq!(steps.len(), 2, "{steps:?}");
+    assert_eq!(steps.len(), 1, "{steps:?}");
     assert!(steps[0].contains("extra"), "{steps:?}");
-    assert!(steps[1].contains("Rebook"), "{steps:?}");
 
     let incomplete = workflow.project(case_ref(), Some(&incomplete_case()));
     assert!(workflow.next_steps(&incomplete).is_empty());

@@ -48,6 +48,8 @@ pub(crate) struct Sources<'a> {
     pub typed_answers_allowed: bool,
     pub config: &'a UnderstandingConfig,
     pub effort: &'a crate::effort::EffortProfile,
+    /// Whether a knowledge source can answer a question about the domain in general.
+    pub knowledge: bool,
 }
 
 /// The operations offered to this turn: every loaded case's, plus what each workflow
@@ -109,7 +111,9 @@ pub(crate) fn input(sources: &Sources<'_>) -> Result<UnderstandingInput, Orchest
             turn = turn.with_done(act);
         }
     }
-    turn = turn.with_settings(sources.effort.settings);
+    turn = turn
+        .with_settings(sources.effort.settings)
+        .with_knowledge(sources.knowledge);
     if let Some(previous) = sources.previous {
         for subject in &previous.subjects {
             if let Some(token) = sources.resolver.token_map().token_for(&subject.key()) {

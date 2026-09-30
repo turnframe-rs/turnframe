@@ -196,6 +196,7 @@ impl Orchestrator {
             clock: Arc::clone(&self.clock),
             case_ids: Arc::clone(&self.case_ids),
             observer: Arc::clone(&self.observer),
+            knowledge: self.composer.has_knowledge(),
         }
     }
 

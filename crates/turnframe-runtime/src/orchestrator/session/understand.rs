@@ -56,6 +56,7 @@ impl Session<'_> {
             typed_answers_allowed: self.runtime.policy.allow_text_resolution_for_low_risk,
             config: &self.runtime.config.understanding,
             effort: &self.effort,
+            knowledge: self.runtime.composer.has_knowledge(),
         };
         // Each step is also said in the user's language, beside the understanding, when
         // the deployment asked for it.

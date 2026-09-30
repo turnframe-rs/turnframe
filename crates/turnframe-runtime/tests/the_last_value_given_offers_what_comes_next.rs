@@ -50,7 +50,7 @@ async fn the_last_value_given_offers_what_comes_next() {
         "{written_from}"
     );
     assert!(
-        written_from.contains("Rebook the quoted flight"),
-        "{written_from}"
+        !written_from.contains("Rebook"),
+        "a rebooking the view cannot show is quoted is not offered: {written_from}"
     );
 }

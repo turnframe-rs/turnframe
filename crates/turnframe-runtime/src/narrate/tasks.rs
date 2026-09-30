@@ -91,6 +91,9 @@ pub(crate) struct AcknowledgeInput<'a> {
     pub guidance: &'a [String],
 }
 
+/// The note for a reply that asks nothing and has nothing to offer next.
+const CLOSING: &str = "nothing is asked and nothing comes next: end with a short question inviting the user to go on, in your own words; never end on a statement alone.";
+
 /// The note for an ask about a record the turn did not reach.
 const ELSEWHERE: &str = "the ask is about another record than the rest of the outcome: its question names that record by its label, so the user knows which one it asks about.";
 
@@ -127,6 +130,9 @@ fn outcome_notes(outcome: &TurnOutcome, carries: bool) -> Vec<&'static str> {
     }
     if outcome.card.is_some() {
         notes.push("card is a card on screen with its buttons. Point the user to it briefly.");
+    }
+    if outcome.closing.is_some() {
+        notes.push(CLOSING);
     }
     if !outcome.next.is_empty() {
         notes.push("next lists what the user may do now that the record needs nothing more. End by offering it in a few words of your own, as one question.");
@@ -409,17 +415,29 @@ pub(crate) struct ReviewInput<'a> {
     pub has_ask: bool,
     /// Whether that ask is about a record the turn did not reach, which the reply names.
     pub elsewhere: bool,
+    /// Whether the material lists what the user may do next.
+    pub has_next: bool,
+    /// Whether nothing is asked and nothing comes next, so the reply invites the user on.
+    pub closing: bool,
     pub on_screen: &'a [String],
     /// Whether the material holds answers or notices the reply must give.
     pub carries: bool,
 }
 
 /// The review's checks, each a yes or no question, with the one it asks.
-const CHECKS: [(&str, &str); 6] = [
+const CHECKS: [(&str, &str); 8] = [
     ("asks_the_ask", "Does the reply ask the ask, in any words?"),
     (
         "names_the_record",
         "Does its question say which record it is about, by the ask's record?",
+    ),
+    (
+        "offers_the_next",
+        "Does it end by offering what next lists, in any words?",
+    ),
+    (
+        "invites_to_go_on",
+        "Does it end with a question inviting the user to go on?",
     ),
     (
         "asks_anything_else",
@@ -448,6 +466,8 @@ impl ReviewInput<'_> {
             .filter(|(name, _)| match *name {
                 "asks_the_ask" | "asks_anything_else" => self.has_ask,
                 "names_the_record" => self.has_ask && self.elsewhere,
+                "offers_the_next" => self.has_next && !self.has_ask,
+                "invites_to_go_on" => self.closing,
                 "contradicts_screen" => !self.on_screen.is_empty(),
                 "leaves_something_out" => self.carries,
                 _ => true,
@@ -466,6 +486,10 @@ pub(crate) struct Verdict {
     #[serde(default)]
     pub names_the_record: Option<bool>,
     #[serde(default)]
+    pub offers_the_next: Option<bool>,
+    #[serde(default)]
+    pub invites_to_go_on: Option<bool>,
+    #[serde(default)]
     pub asks_anything_else: Option<bool>,
     #[serde(default)]
     pub claims_beyond_material: Option<bool>,
@@ -483,6 +507,14 @@ impl Verdict {
             (
                 "does_not_name_the_record",
                 self.names_the_record == Some(false),
+            ),
+            (
+                "does_not_offer_the_next",
+                self.offers_the_next == Some(false),
+            ),
+            (
+                "leaves_no_way_forward",
+                self.invites_to_go_on == Some(false),
             ),
             ("asks_something_else", self.asks_anything_else == Some(true)),
             (
@@ -507,6 +539,8 @@ impl Verdict {
         match check {
             "asks_the_ask" => self.asks_the_ask,
             "names_the_record" => self.names_the_record,
+            "offers_the_next" => self.offers_the_next,
+            "invites_to_go_on" => self.invites_to_go_on,
             "asks_anything_else" => self.asks_anything_else,
             "claims_beyond_material" => self.claims_beyond_material,
             "contradicts_screen" => self.contradicts_screen,
@@ -676,6 +710,8 @@ mod tests {
             material: Value::Null,
             has_ask: true,
             elsewhere: true,
+            has_next: true,
+            closing: true,
             on_screen: &on_screen,
             carries: true,
         };
@@ -694,6 +730,8 @@ mod tests {
             material: Value::Null,
             has_ask: false,
             elsewhere: false,
+            has_next: false,
+            closing: false,
             on_screen: &[],
             carries: false,
         };
@@ -745,6 +783,47 @@ mod tests {
     }
 
     #[test]
+    fn a_reply_with_nothing_asked_is_to_end_on_the_question_to_go_on() {
+        let closing = TurnOutcome {
+            done: vec!["Named: A 1 is now called X.".to_owned()],
+            closing: Some("What would you like to do next?".to_owned()),
+            ..TurnOutcome::default()
+        };
+        let note = "nothing is asked and nothing comes next";
+        assert!(acknowledged(&closing).contains(note));
+        assert!(!acknowledged(&asking_elsewhere(false)).contains(note));
+    }
+
+    #[test]
+    fn a_review_checks_the_reply_ends_on_a_way_forward() {
+        let checks = |has_ask, has_next, closing| {
+            let review = ReviewInput {
+                reply: "Done.",
+                material: Value::Null,
+                has_ask,
+                elsewhere: false,
+                has_next,
+                closing,
+                on_screen: &[],
+                carries: false,
+            };
+            let schema = Review(PhantomData).schema(&review);
+            let asked = schema["properties"].as_object().unwrap().clone();
+            (
+                asked.contains_key("offers_the_next"),
+                asked.contains_key("invites_to_go_on"),
+            )
+        };
+        assert_eq!(checks(false, true, false), (true, false));
+        assert_eq!(
+            checks(true, true, false),
+            (false, false),
+            "the ask is the way forward"
+        );
+        assert_eq!(checks(false, false, true), (false, true));
+    }
+
+    #[test]
     fn a_review_checks_the_ask_names_a_record_the_turn_did_not_reach() {
         let checks = |elsewhere| {
             let review = ReviewInput {
@@ -752,6 +831,8 @@ mod tests {
                 material: Value::Null,
                 has_ask: true,
                 elsewhere,
+                has_next: false,
+                closing: false,
                 on_screen: &[],
                 carries: false,
             };

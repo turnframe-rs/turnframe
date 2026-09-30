@@ -145,6 +145,15 @@ fn converted(
             continue;
         };
         check_one_of(&format!("{name}.message"), message, &messages)?;
+        // Words this part of the message repeats are the value, wherever the reading pointed:
+        // what the user says now outranks an earlier copy that matching reads as the same.
+        let (message, span) = match given {
+            Given::Words { text, .. } if message != CURRENT && !text.trim().is_empty() => turn
+                .message
+                .narrow(input.words, text)
+                .map_or((message, span), |here| (CURRENT, here)),
+            _ => (message, span),
+        };
         let (reference, words) = message_words(turn, message)
             .ok_or_else(|| not_one_of(&format!("{name}.message"), message, &messages))?;
         let span = match given {

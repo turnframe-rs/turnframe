@@ -40,6 +40,8 @@ pub struct UnderstandingInput {
     pub last_subjects: Vec<TargetToken>,
     /// How this turn is run, over the understander's own settings.
     pub settings: Option<crate::Settings>,
+    /// Whether a knowledge source can answer a question about the domain in general.
+    pub knowledge: bool,
 }
 
 impl UnderstandingInput {
@@ -59,7 +61,16 @@ impl UnderstandingInput {
             receipts: Vec::new(),
             last_subjects: Vec::new(),
             settings: None,
+            knowledge: true,
         }
+    }
+
+    /// Says whether a knowledge source can answer a question about the domain in general;
+    /// without one, no question is read as asking it.
+    #[must_use]
+    pub const fn with_knowledge(mut self, knowledge: bool) -> Self {
+        self.knowledge = knowledge;
+        self
     }
 
     /// Runs this turn under `settings` instead of the understander's.

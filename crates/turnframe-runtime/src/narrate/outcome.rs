@@ -33,6 +33,10 @@ pub(crate) struct TurnOutcome {
     /// What the user may do next, when the record needs nothing more.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub next: Vec<String>,
+    /// The question a reply ends on when nothing is asked, no card is on screen and nothing
+    /// comes next: no reply leaves the user without a way forward.
+    #[serde(skip)]
+    pub closing: Option<String>,
 }
 
 impl TurnOutcome {
@@ -95,6 +99,8 @@ pub struct AskCopy {
     /// A question about a record the turn did not reach; `{record}` is its label and
     /// `{question}` the question.
     pub elsewhere: LocalizedText,
+    /// The question a reply ends on when it asks nothing else.
+    pub go_on: LocalizedText,
 }
 
 impl AskCopy {
@@ -113,6 +119,7 @@ impl AskCopy {
             obligation: LocalizedText::new("Still needed: {what}."),
             contested: LocalizedText::new("{what} What should it be instead?"),
             elsewhere: LocalizedText::new("{record}: {question}"),
+            go_on: LocalizedText::new("What would you like to do next?"),
         }
     }
 }
@@ -125,7 +132,14 @@ impl Default for AskCopy {
 
 crate::copy::server_copy!(
     AskCopy,
-    [value, refused_value, obligation, contested, elsewhere]
+    [
+        value,
+        refused_value,
+        obligation,
+        contested,
+        elsewhere,
+        go_on
+    ]
 );
 
 /// The built-in Italian of [`AskCopy`], by field.
@@ -138,6 +152,7 @@ const ITALIAN: &[(&str, &str)] = &[
     ("obligation", "Manca ancora: {what}."),
     ("contested", "{what} Come dovrebbe essere, invece?"),
     ("elsewhere", "{record}: {question}"),
+    ("go_on", "Cosa vuoi fare adesso?"),
 ];
 
 fn fill(template: &LocalizedText, locale: &Locale, pairs: &[(&str, &str)]) -> String {
@@ -334,6 +349,8 @@ impl Material<'_> {
         } else {
             Vec::new()
         };
+        let closing = (ask.is_none() && card.is_none() && next.is_empty())
+            .then(|| self.copy.go_on.resolve(locale).to_owned());
         TurnOutcome {
             done,
             not_done,
@@ -342,6 +359,7 @@ impl Material<'_> {
             ask,
             card,
             next,
+            closing,
         }
     }
 }

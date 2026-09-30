@@ -63,12 +63,17 @@ async fn acknowledgements(narration: NarrationConfig, with_an_act: bool) -> (Vec
 }
 
 /// A turn with nothing of its own does not get asked for a sentence about it: its one
-/// reply is its answer as written. A question about what can be done proposes in its
-/// own answer, so the obligations of the trip in view stay background.
+/// reply is its answer as written, and the question to go on that ends every reply. A
+/// question about what can be done proposes in its own answer, so the obligations of the
+/// trip in view stay background.
 #[tokio::test]
 async fn a_turn_with_nothing_of_its_own_writes_no_acknowledgement() {
     let (replies, calls) = acknowledgements(NarrationConfig::conservative(), false).await;
-    assert_eq!(replies, ["Quite a lot."], "the answer is the reply");
+    assert_eq!(
+        replies,
+        ["Quite a lot.\n\nWhat would you like to do next?"],
+        "the answer is the reply, and it ends on a way forward"
+    );
     assert_eq!(
         calls, 0,
         "and the decision is taken before the call, not hoped for after it"

@@ -327,18 +327,15 @@ fn card_frame(view: &InteractionView, locale: &Locale) -> CardFrame {
     }
 }
 
-/// Whether the turn's reply says `text` whole.
-fn said_by_reply(turn: &AssistantTurn, text: &str) -> bool {
-    turn.blocks.iter().any(
-        |block| matches!(block, ResponseBlock::Transition(transition) if transition.text == text),
-    )
-}
-
-/// Whether a model wrote the reply `text`: it is one of the turn's answers.
-fn narrated(turn: &AssistantTurn, text: &str) -> bool {
+/// The answers a model wrote for the turn's questions.
+fn answers(turn: &AssistantTurn) -> Vec<String> {
     turn.blocks
         .iter()
-        .any(|block| matches!(block, ResponseBlock::Answer(answer) if answer.text == text))
+        .filter_map(|block| match block {
+            ResponseBlock::Answer(answer) => Some(answer.text.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Accumulates one run's frames.
@@ -568,23 +565,21 @@ impl Recorder {
                     frame.code = Some(receipt.receipt.status_code.clone());
                     self.frames.push(frame);
                 }
-                // A reply of answers alone is the answers: shown once, as the model's.
-                ResponseBlock::Answer(answer) if !said_by_reply(turn, &answer.text) => {
-                    let mut frame = Frame::new(Station::Ledger, Kind::Reply, answer.text.clone());
-                    frame.scripted = true;
-                    self.frames.push(frame);
+                // The reply is the answers, the model's words, then what the server adds.
+                ResponseBlock::Transition(transition) => {
+                    let mut rest = transition.text.clone();
+                    for answer in answers(turn) {
+                        rest = rest.replacen(&answer, "", 1);
+                        let mut frame = Frame::new(Station::Ledger, Kind::Reply, answer);
+                        frame.scripted = true;
+                        self.frames.push(frame);
+                    }
+                    let rest = rest.trim();
+                    if !rest.is_empty() {
+                        self.frames
+                            .push(Frame::new(Station::Ledger, Kind::Reply, rest));
+                    }
                 }
-                ResponseBlock::Transition(transition) if narrated(turn, &transition.text) => {
-                    let mut frame =
-                        Frame::new(Station::Ledger, Kind::Reply, transition.text.clone());
-                    frame.scripted = true;
-                    self.frames.push(frame);
-                }
-                ResponseBlock::Transition(transition) => self.frames.push(Frame::new(
-                    Station::Ledger,
-                    Kind::Reply,
-                    transition.text.clone(),
-                )),
                 _ => {}
             }
         }

@@ -173,10 +173,7 @@ pub fn turn(turn: &AssistantTurn, locale: &Locale) {
                 ),
             ),
             ResponseBlock::Notice(block) => ("notice", block.text.resolve(locale).to_owned()),
-            // A blocking card is printed whole after the turn, options and all.
-            ResponseBlock::Interaction(block) if !block.view.blocking => {
-                ("card", block.view.title.resolve(locale).to_owned())
-            }
+            // A card is printed whole after the turn, options and all, blocking or not.
             _ => continue,
         };
         println!("  {}{}", style::tag(kind), style::muted(&text));

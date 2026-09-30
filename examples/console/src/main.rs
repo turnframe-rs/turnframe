@@ -278,19 +278,22 @@ fn pressed(text: &str, card: Option<&Interaction>) -> Option<OptionId> {
         .map(|option| option.id.clone())
 }
 
-/// The blocking card waiting on a record, if the turn left one.
+/// The card waiting on a record, if the turn left one: a blocking one first, else one that
+/// asks without blocking, such as which record was meant. Either is answered by its number.
 async fn open_card(
     stores: &FakeStores,
     records: &directory::Records,
     account: &AccountId,
 ) -> Option<Interaction> {
+    let mut open = Vec::new();
     for (key, _) in records.labelled(account) {
-        let open = stores.open_interactions(account, &key).await.ok()?;
-        if let Some(card) = open.into_iter().find(|interaction| interaction.blocking) {
-            return Some(card);
-        }
+        open.extend(stores.open_interactions(account, &key).await.ok()?);
     }
-    None
+    let at = open
+        .iter()
+        .position(|interaction| interaction.blocking)
+        .unwrap_or(0);
+    (at < open.len()).then(|| open.swap_remove(at))
 }
 
 /// The trip the desk is working on: complete, with the airline's offer for the cancelled

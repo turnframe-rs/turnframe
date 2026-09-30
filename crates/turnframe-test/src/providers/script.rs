@@ -176,7 +176,9 @@ fn review(schema: &serde_json::Value, claims: bool) -> serde_json::Value {
     for check in checks {
         let answer = match check.as_str() {
             "reasoning" => serde_json::Value::from("Judged against the material."),
-            "asks_the_ask" | "names_the_record" => serde_json::Value::from(true),
+            "asks_the_ask" | "names_the_record" | "offers_the_next" | "invites_to_go_on" => {
+                serde_json::Value::from(true)
+            }
             "claims_beyond_material" => serde_json::Value::from(claims),
             _ => serde_json::Value::from(false),
         };
