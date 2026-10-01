@@ -11,7 +11,7 @@ use turnframe::runtime::config::{NarrationConfig, OrchestratorConfig};
 pub fn provider_from_environment() -> anyhow::Result<(Arc<dyn ModelProvider>, String)> {
     let model = std::env::var("TURNFRAME_MODEL").ok();
     if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-        let model = model.unwrap_or_else(|| "gpt-4o-mini".to_owned());
+        let model = model.unwrap_or_else(|| "gpt-6-luna".to_owned());
         let provider = turnframe::provider::openai::OpenAiProvider::openai()
             .api_key(ApiKey::new(key))
             .model(model.clone())

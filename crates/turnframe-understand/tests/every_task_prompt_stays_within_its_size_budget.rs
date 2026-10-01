@@ -155,7 +155,7 @@ fn every_task_prompt_stays_within_its_size_budget() {
             note: None,
             continues: None,
         },
-        780,
+        800,
     );
     pinned(
         "question_frame",

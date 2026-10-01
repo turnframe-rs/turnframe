@@ -289,7 +289,7 @@ fn editing_operations() -> Vec<OperationSpec> {
         .example_not_given("I want to change the travel date", ["value"]),
         operation(
             operations::ADD_EXTRA,
-            "Add one extra to the trip, what it is, how many and at what price; each extra is added on its own.",
+            "Add one new extra to the trip, what it is, how many and at what price; each extra is added on its own.",
             existing,
         )
         .arguments::<AddExtraArgs>()
@@ -1150,7 +1150,7 @@ const ITALIAN: &[(&str, &str)] = &[
     ),
     (
         operations::ADD_EXTRA,
-        "Aggiunge un extra al viaggio, cos'è, quanti e a che prezzo; ogni extra si aggiunge da solo.",
+        "Aggiunge un extra nuovo al viaggio, cos'è, quanti e a che prezzo; ogni extra si aggiunge da solo.",
     ),
     (
         operations::ASSIGN_PAYER,

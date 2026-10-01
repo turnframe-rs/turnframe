@@ -192,7 +192,7 @@ endpoint. It never runs in continuous integration: without a key it skips with a
 | `TURNFRAME_TRACE` | trace every turn to `traces/`, as the examples do; one file per run |
 
 ```sh
-TURNFRAME_EVAL_LIVE_KEY=... TURNFRAME_EVAL_LIVE_VENDOR=openai TURNFRAME_EVAL_LIVE_MODEL=gpt-5.4-mini \
+TURNFRAME_EVAL_LIVE_KEY=... TURNFRAME_EVAL_LIVE_VENDOR=openai TURNFRAME_EVAL_LIVE_MODEL=gpt-6-luna \
   cargo test -p turnframe-eval --test live_corpus the_corpus_runs -- --nocapture
 ```
 
@@ -274,7 +274,7 @@ never starts one, and it never runs in continuous integration. It reads the live
 | `TURNFRAME_EVAL_SIMULATE_REPORT` | an absolute path for the machine-readable report, transcripts included |
 
 ```sh
-TURNFRAME_EVAL_LIVE_KEY=... TURNFRAME_EVAL_SIMULATE=1 TURNFRAME_EVAL_LIVE_MODEL=gpt-5.4-mini \
+TURNFRAME_EVAL_LIVE_KEY=... TURNFRAME_EVAL_SIMULATE=1 TURNFRAME_EVAL_LIVE_MODEL=gpt-6-luna \
   cargo test -p turnframe-eval --test simulated_users simulated_users_talk -- --nocapture
 ```
 

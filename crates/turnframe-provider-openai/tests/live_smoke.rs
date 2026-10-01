@@ -19,7 +19,7 @@
 //! | Variable | Meaning | Default |
 //! |---|---|---|
 //! | `TURNFRAME_OPENAI_LIVE_KEY` | the credential; absent means skip | — |
-//! | `TURNFRAME_OPENAI_LIVE_MODEL` | the model to call | `gpt-4o-mini` |
+//! | `TURNFRAME_OPENAI_LIVE_MODEL` | the model to call | `gpt-6-luna` |
 //! | `TURNFRAME_OPENAI_LIVE_BASE_URL` | an OpenAI-compatible endpoint | OpenAI's own |
 
 #![allow(
@@ -35,6 +35,7 @@ use serde::Deserialize;
 use serde_json::json;
 use turnframe_provider::conformance::payloads;
 use turnframe_provider::prelude::*;
+use turnframe_provider::request::ReasoningEffort;
 use turnframe_provider_openai::OpenAiProvider;
 
 /// The credential that switches these tests on.
@@ -48,7 +49,7 @@ const BASE_URL_VAR: &str = "TURNFRAME_OPENAI_LIVE_BASE_URL";
 
 /// The model called when [`MODEL_VAR`] is unset: the cheapest one that
 /// enforces a JSON schema.
-const DEFAULT_MODEL: &str = "gpt-4o-mini";
+const DEFAULT_MODEL: &str = "gpt-6-luna";
 
 /// A live call gets more room than a mock and still cannot hang a suite.
 const LIVE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -124,6 +125,7 @@ async fn a_real_endpoint_enforces_a_real_schema() {
         .with_message(Message::user("The word is 'turnframe'. Count its letters."))
         .with_output(OutputSpec::json("turnframe_live_smoke", schema.clone()))
         .with_max_output_tokens(64)
+        .with_reasoning_effort(ReasoningEffort::Minimal)
         .with_timeout(LIVE_TIMEOUT);
 
     let response = provider
@@ -160,6 +162,7 @@ async fn a_real_stream_reassembles_into_a_real_answer() {
         .with_system("Reply in one short sentence.")
         .with_message(Message::user("Say hello to Turnframe."))
         .with_max_output_tokens(64)
+        .with_reasoning_effort(ReasoningEffort::Minimal)
         .with_timeout(LIVE_TIMEOUT);
 
     let stream = provider

@@ -133,16 +133,15 @@ impl TaskProfile {
                 max_output_tokens: Some(400),
                 ..base
             },
+            // A writer keeps the model's own temperature; reasoning would spend its cap.
             TaskKind::Acknowledge => Self {
                 temperature: None,
-                reasoning_effort: None,
                 max_output_tokens: Some(300),
                 review: true,
                 ..base
             },
             TaskKind::Answer => Self {
                 temperature: None,
-                reasoning_effort: None,
                 ..base
             },
             TaskKind::Review => Self {
@@ -152,7 +151,6 @@ impl TaskProfile {
             // A progress line is a preview: one call, and nothing waits for it.
             TaskKind::Progress => Self {
                 temperature: None,
-                reasoning_effort: None,
                 max_output_tokens: Some(80),
                 repairs: 0,
                 retries: 0,
@@ -428,6 +426,22 @@ mod tests {
             TaskProfile::default_for(TaskKind::Extract).reasoning_effort,
             Some(ReasoningEffort::Minimal)
         );
+    }
+
+    #[test]
+    fn a_reply_is_written_at_the_least_effort() {
+        for kind in [TaskKind::Acknowledge, TaskKind::Answer, TaskKind::Progress] {
+            let writer = TaskProfile::default_for(kind);
+            assert_eq!(
+                writer.reasoning_effort,
+                Some(ReasoningEffort::Minimal),
+                "{kind:?}"
+            );
+            assert_eq!(
+                writer.temperature, None,
+                "{kind:?} keeps the model's own voice"
+            );
+        }
     }
 
     #[test]

@@ -152,6 +152,8 @@ impl BudgetTracker {
             return Err(bound);
         }
         let limit = self.budget.max_model_calls.unwrap_or(u32::MAX);
+        // Rust 1.99 renames this `try_update`, which the 1.88 MSRV does not have.
+        #[allow(deprecated)]
         let reserved = self
             .calls
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |calls| {

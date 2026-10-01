@@ -356,15 +356,20 @@ pub(crate) fn build_request(
 }
 
 /// The `reasoning_effort` value for `model`. The least effort is `minimal` on `gpt-5`,
-/// `none` from `gpt-5.1` on, and `low` on the `o` families, which have neither.
+/// `none` from `gpt-5.1` on, and `low` on the models that have neither: the `o` families,
+/// `gpt-6-astra` and `gpt-6.1-sol`.
 fn effort_label(effort: ReasoningEffort, model: &str) -> &'static str {
     let name = model.rsplit('/').next().unwrap_or(model);
-    let o_series = ["o1", "o3", "o4"]
+    let no_none = ["o1", "o3", "o4", "gpt-6-astra", "gpt-6.1-sol"]
         .iter()
         .any(|family| name.starts_with(family));
+    let generation = crate::profile::gpt_generation(name);
     match effort {
-        ReasoningEffort::Minimal if o_series => ReasoningEffort::Low.as_str(),
-        ReasoningEffort::Minimal if name.starts_with("gpt-5.") => "none",
+        ReasoningEffort::Minimal if no_none => ReasoningEffort::Low.as_str(),
+        ReasoningEffort::Minimal if generation == Some(5) && !name.starts_with("gpt-5.") => {
+            ReasoningEffort::Minimal.as_str()
+        }
+        ReasoningEffort::Minimal if generation.is_some_and(|g| g >= 5) => "none",
         other => other.as_str(),
     }
 }
@@ -1342,6 +1347,25 @@ mod tests {
             body["reasoning_effort"], "low",
             "the o families have no minimal effort"
         );
+
+        for (model, least) in [
+            ("gpt-6-luna", "none"),
+            ("gpt-6-sol", "none"),
+            ("openai/gpt-6-sol-2026-09-22", "none"),
+            ("gpt-6-astra", "low"),
+            ("gpt-6.1-sol", "low"),
+        ] {
+            let declared = crate::profile::declared_for_model(
+                caps().with_temperature(true).with_seed(true),
+                model,
+            );
+            let converted = build_request(&request, model, &declared, &Quirks::openai(), false)
+                .expect("converts");
+            let body = serde_json::to_value(&converted.body).expect("serializes");
+            assert_eq!(body["reasoning_effort"], least, "{model}");
+            assert!(body.get("temperature").is_none(), "{model}: {body}");
+            assert!(body.get("seed").is_none(), "{model}: {body}");
+        }
     }
 
     #[test]

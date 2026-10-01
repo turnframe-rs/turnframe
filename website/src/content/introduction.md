@@ -59,8 +59,8 @@ Repeating the turn, clicking twice or crashing half way through cannot repeat an
 ## Small models are the point
 
 No understanding task needs more than a few hundred tokens of context, so the reading runs on
-mini and flash models. Accuracy is bought with more checked calls on the same small model:
-a turn runs at `low`, `medium` or `high` effort, and the level changes how a message is read,
+small models. Accuracy is bought with more checked calls on the same small model: a turn runs at
+`low`, `medium` or `high` effort, and the level changes how a message is read,
 never what policy, cards or the claim guard allow. What this release measured, and what it did not,
 is in [benchmarks](/docs/benchmarks).
 

@@ -1,5 +1,5 @@
 // Facts the site prints, read from the repository it is built from, so a page cannot drift
-// from the code: the version, MSRV and links from the workspace manifest, the crate family
+// from the code: the facade's version, MSRV and links from the workspace manifest, the crate family
 // from the README, the features from the facade, and every measured figure from
 // docs/benchmarks.md. A source whose shape changed fails the build with the file to look at.
 import { execFileSync } from 'node:child_process';
@@ -29,7 +29,9 @@ function fail(path, what) {
 const workspace = parseToml(read('Cargo.toml'));
 
 export const REPO = workspace.workspace.package.repository;
-export const VERSION = workspace.workspace.package.version;
+// The facade's version is the one applications see; a release may leave other crates behind it.
+const facade = parseToml(read('crates/turnframe/Cargo.toml')).package.version;
+export const VERSION = typeof facade === 'string' ? facade : workspace.workspace.package.version;
 export const MSRV = workspace.workspace.package['rust-version'];
 export const LICENSE = workspace.workspace.package.license;
 export const KEYWORDS = workspace.workspace.package.keywords ?? [];
