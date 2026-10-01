@@ -737,7 +737,7 @@ impl turnframe_runtime::orchestrator::CaseDirectory for Records {
 /// The defaults are small, cheap and current: the point is to exercise the
 /// pipeline end to end against a real model, not to benchmark a frontier one.
 pub const VENDORS: [(&str, &str); 3] = [
-    ("openai", "gpt-4o-mini"),
+    ("openai", "gpt-6-luna"),
     ("anthropic", "claude-haiku-4-5-20251001"),
     ("gemini", "gemini-2.5-flash"),
 ];

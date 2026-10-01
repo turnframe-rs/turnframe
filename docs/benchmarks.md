@@ -141,6 +141,62 @@ and the rest one kind of turn each. The showcase items are the cases the guarant
 card the airline re-quoted after it was shown, an airline that has not answered, a leg the user
 asked to keep while the other is rebooked, and acts in one message that depend on each other.
 
+Measured on 1 October 2026 against OpenAI's `gpt-6-luna` at the default `medium` effort, three
+samples per item, three items played at once. Cost is priced at $0.10 per million input tokens and
+$0.50 per million output tokens, reasoning included. Latency is a whole turn, reply included, over
+every turn a run played, the earlier turns of a conversation among them.
+
+| Run | Samples passed | Items at 3/3 | Model calls | Input tokens | Output tokens (reasoning) | Turn p50 / p95 | Cost |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| First | 227/228 (99.6%) | 75/76 | 3,409 | 2,805,255 | 181,797 (42,376) | 9.6 s / 16.5 s | $0.37 |
+
+`gpt-6-luna` is the model these figures are measured on from 0.2.1. A run costs about an eighth of
+one on `gpt-5.4-mini`, whose runs of the 0.2.0 code are in the next section.
+
+The run first passed 222 of 228, on the 0.2.1 code before the rules it showed were written. Each
+rule is a sentence measured by replaying the call it changes on this model, twenty or thirty times
+before and after. «il numero fedeltà non te lo do» was read as a condition to leave the number as
+it is: refusing to give a value is now a request. A payer given for an extra the trip already held
+was read as a new extra: the sample's operation now says it adds a new one. The check called «the
+end of the month» an incomplete date: words that place a day now state the day they place, and a
+day they do not place is still found different. With those rules in, «I would rather fly today»
+was read as small talk in one sample: saying what one would rather a record hold is now a request.
+In the same run, 12 of 284 replies spent their whole cap reasoning and came back empty, so the turn
+fell back to the reply code writes; replies are now written at the least effort, which on this
+model is none.
+
+The items those rules act on were run again, three samples each, whatever their result: the three
+that refuse a value, the seventeen whose messages add an extra or say who pays, and the four that
+give a day without naming it; then the four that state a preference, once that rule was in. The
+last measurement of each item stands. Four items read the code as released, twenty read it before
+the preference rule, and 52 keep their first-run samples: none of their messages refuses a value,
+gives an extra or a payer, places a day or states a preference, though every reading now goes
+through the new sentences. The row counts the calls and tokens of exactly the samples kept, each
+call placed on its item by the messages its request quotes; 34 calls no request placed are counted
+too. Its turn times are the first run's over all its 282 turns, since items played at once share
+turn numbers. The report is `crates/turnframe-eval/baselines/2026-10-01-medium-x3-gpt-6-luna.json`.
+
+The one sample missed, in `conversation.whole_trip.it`, read «le paga l'azienda», the company pays
+for them, as the airline, which Italian calls «compagnia aerea». The check found the value
+different and the second reading repeated it, so the turn asked again and recorded no payer.
+Describing the payer's values in the sample's own words did not change the rate in replay.
+
+**What does not vary.** In no sample on either model did a rebooking go to the airline without a
+click on a card showing its current fare, a click on a card drawn before the fare changed run, or
+an outcome the airline had not given get recorded. Code enforces these, not a model: seven items
+forbid a rebooking nobody clicked for, and the silent airline's forbids a recorded outcome. Every
+failure above is a reading: a value in the wrong place, a part left unread, an act the user did not
+ask for.
+
+**What is not measured in this release.** Other models, the other vendors' adapters, and the `low`
+and `high` levels were not run on this corpus, and the row above merges three runs: no single run
+read the code as released. Each vendor's adapter has a live test of its schema dialect against the
+real endpoint, which is a different claim; the OpenAI one passed on `gpt-6-luna`, `gpt-6-sol`,
+`gpt-6.1-sol` and `gpt-6-astra`. Seventy-six items at three samples each can rank two versions of
+the code on this corpus and this model, and nothing more.
+
+## The corpus on `gpt-5.4-mini`, through 0.2.0
+
 Measured on 28 to 30 September 2026 against OpenAI's `gpt-5.4-mini` at the default `medium`
 effort, three samples per item, one turn at a time. Cost is priced at $0.75 per million input
 tokens and $4.50 per million output tokens, reasoning included. Latency is a whole turn, reply
@@ -159,7 +215,7 @@ included, over every turn a run played, the earlier turns of a conversation amon
 | Ninth | 228/228 (100.0%) | 76/76 | 3,383 | 2,669,662 | 185,202 (26,632) | 7.7 s / 13.6 s | $2.84 |
 | Tenth | 227/228 (99.6%) | 75/76 | 3,434 | 2,831,091 | 205,090 (42,505) | 8.6 s / 15.9 s | $3.05 |
 
-Each run read a later state of this release's code. Every misreading a run showed became a rule
+Each run read a later state of the 0.2.0 code. Every misreading a run showed became a rule
 stated in general terms, or a sentence of the sample domain's own configuration, with a scripted
 test where code changed, before the next run. The fourth run measured a change to how every message
 is split, made for one item, that split «Lisbon for March» in two; it was taken back, and the item
@@ -207,7 +263,7 @@ above is a reading: a value in the wrong place, a part left unread, an act the u
 The worst was a trip named from the words of a dispute («that is wrong») in the first two runs,
 fixed since.
 
-**What is not measured in this release.** Other models, the other vendors' adapters, and the `low`
+**What was not measured for 0.2.0.** Other models, the other vendors' adapters, and the `low`
 and `high` levels were not run on this corpus. Each vendor's adapter has a live test of its schema
 dialect against the real endpoint, which is a different claim. Seventy-six items at three samples
 each can rank two versions of the code on this corpus and this model, and nothing more.
@@ -216,9 +272,17 @@ each can rank two versions of the code on this corpus and this model, and nothin
 
 The corpus above measures single messages. [Simulated users](evaluation.md) measure conversations:
 a model plays a person with a goal and a manner, and code scores what the stores and the turns show.
-Measured on 30 September 2026 against OpenAI's `gpt-5.4-mini`, which also played the users, at the
+Measured on 1 October 2026 against OpenAI's `gpt-6-luna`, which also played the users, at the
 default `medium` effort: the five travel desk goals of `tests/simulated_users/`, ten manners, one
-conversation each. The first two runs held them on the harness's fixed day in 2023, so a user who
+conversation each, held on 30 September 2026. The run read the 0.2.1 code before its last rule,
+the one that reads a stated preference as a request.
+
+| Run | Reached | Turns | Dead ends | Loops | Not understood | Refused | Offers refused | Violations |
+|-----|---------|-------|-----------|-------|----------------|---------|----------------|------------|
+| First | 10/10 | 31 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+On `gpt-5.4-mini`, the 0.2.0 code was measured on 30 September 2026, with the same model playing
+the users. The first two runs held them on the harness's fixed day in 2023, so a user who
 gave no year was read in 2023 or 2024 and a goal written for 2026 could be missed; from the third
 on, the conversations are held on 30 September 2026, a day of the year the goals are written for.
 
@@ -232,7 +296,7 @@ on, the conversations are held on 30 September 2026, a day of the year the goals
 | Sixth | 10/10 | 31 | 0 | 1 | 2 | 0 | 0 | 0 |
 | Release | 10/10 | 28 | 0 | 1 | 3 | 0 | 0 | 0 |
 
-Each run read a later state of this release's code, and what a run showed became a rule stated in
+Each run read a later state of the 0.2.0 code, and what a run showed became a rule stated in
 general terms, or a sentence of the sample domain's configuration, with a test, before the next:
 the third run's four «confirm the rebooking» turns after the rebooking had left, read as not
 understood; the fourth run's name taken with the words asking for it; the fifth run's question

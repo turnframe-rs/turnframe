@@ -43,9 +43,11 @@ async fn sent_body(model: &str) -> Value {
 
 #[tokio::test]
 async fn a_reasoning_model_gets_max_completion_tokens() {
-    let body = sent_body("gpt-5.4-mini").await;
-    assert_eq!(body["max_completion_tokens"], 64);
-    assert!(body.get("max_tokens").is_none(), "{body}");
+    for model in ["gpt-5.4-mini", "gpt-6-luna", "gpt-6.1-sol"] {
+        let body = sent_body(model).await;
+        assert_eq!(body["max_completion_tokens"], 64, "{model}");
+        assert!(body.get("max_tokens").is_none(), "{model}: {body}");
+    }
 }
 
 #[tokio::test]

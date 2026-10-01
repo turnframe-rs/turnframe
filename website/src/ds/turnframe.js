@@ -895,7 +895,7 @@ function EffortSettings({ defaultValue = "medium", presets, pricing, foot, class
         React4.createElement(
           "div",
           { className: "tf-fx__cap" },
-          "Reading \xB7 probabilistic \xB7 on a mini model",
+          "Reading \xB7 probabilistic \xB7 on a small model",
         ),
         p.measured
           ? [
@@ -1388,7 +1388,7 @@ function TurnPlayer({
             " calls",
           ),
           " on a ",
-          React6.createElement("b", null, "mini"),
+          React6.createElement("b", null, "small"),
           " model",
           stepsMode === "said" && saidCount ? ` (${saidCount} for StepSaid)` : "",
           " \xB7 ",
@@ -1898,7 +1898,7 @@ function Manifesto({ className }) {
       [
         "input",
         "Models propose meaning.",
-        "Small tasks, one narrow question each, answers checked by code. Mini and flash models are enough.",
+        "Small tasks, one narrow question each, answers checked by code. Small models are enough.",
       ],
       [
         "decide",
@@ -2011,7 +2011,7 @@ var SPEC = [
     {
       n: "4",
       title: "Semantic turn completion",
-      what: "Mini models read one narrow question at a time, so they are sometimes wrong. This is the only place RNG lives.",
+      what: "Small models read one narrow question at a time, so they are sometimes wrong. This is the only place RNG lives.",
       by: "Checked tasks, votes, mandatory safe degradation",
       soft: !0,
       tag: "RNG \xB7 fails safe",

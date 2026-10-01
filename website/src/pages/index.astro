@@ -36,13 +36,14 @@ const presets = Object.fromEntries(
     level === run.level && !run.notMeasured.includes(level) ? { ...run, measured: true, does } : { does },
   ]),
 );
-const foot = `Measured ${run.date} · ${run.model} at ${run.level} · ${run.run} of ${run.runs} runs · ${run.items}-item live corpus, ${run.samplesPerItem} samples each · docs/benchmarks.md`;
+const runs = run.runs === 1 ? '' : ` · ${run.run} of ${run.runs} runs`;
+const foot = `Measured ${run.date} · ${run.model} at ${run.level}${runs} · ${run.items}-item live corpus, ${run.samplesPerItem} samples each · docs/benchmarks.md`;
 
 const GUARANTEES = [
   ['Side effects', 'never the wrong record, a stale revision or twice', true],
   ['Claims', 'a receipt only for a committed event', true],
   ['Workflow state', 'one phase, projected purely', true],
-  ['Understanding', 'on a mini model; a misreading still meets every check', false],
+  ['Understanding', 'on a small model; a misreading still meets every check', false],
 ];
 // The Flow Map, as the README states it: each step, who holds it, and what it decides.
 const FLOW = [
@@ -117,7 +118,7 @@ cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; 
         <span class="tf-rec">Rec</span>
         <span class="site-hud-name"><b>Turnframe</b></span>
         <span>Deterministic conversational workflows for Rust</span>
-        <span>Mini · flash · any provider</span>
+        <span>Small models · any provider</span>
         <span>v{version}<span class="site-hud-extra"> · {LICENSE.replace(' OR ', ' or ')}</span></span>
       </div>
       <h1>
@@ -129,7 +130,7 @@ cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; 
         <div>
           <p class="tf-hero__lead">
             Turnframe is a Rust library for LLM conversational workflows that write to real records. Small checked
-            tasks, sized for <b>mini and flash models</b>, read what a message means and stream each step as it is
+            tasks, sized for <b>small, cheap models</b>, read what a message means and stream each step as it is
             decided. <b>Deterministic reducers decide what happens.</b> The reply claims only what the ledger
             confirmed. Randomness lives in the reading, <b>never in the effects</b>.
           </p>
@@ -216,8 +217,8 @@ cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; 
     </SiteSection>
 
     <SiteSection id="cost" number="05" eyebrow="Low spec"
-      title="Mini models." turn="Frame‑perfect effects."
-      lead={`No task needs more than a few hundred tokens, so the reading runs on mini and flash models: on this release's corpus, ${run.model} passed ${run.passed} samples at ${run.level}. Accuracy is bought with checked calls on the same small model, and effects are identical at every setting. How each run was measured, and what the figures cannot show, is in the benchmarks.`}>
+      title="Small models." turn="Frame‑perfect effects."
+      lead={`No task needs more than a few hundred tokens, so the reading runs on small models: on this release's corpus, ${run.model} passed ${run.passed} samples at ${run.level}. Accuracy is bought with checked calls on the same small model, and effects are identical at every setting. How each run was measured, and what the figures cannot show, is in the benchmarks.`}>
       <EffortSettings client:visible presets={presets} pricing={run.pricing} foot={foot} />
       <p class="home-more"><a href="/docs/benchmarks">What is measured, and what is not claimed <Icon name="arrow" /></a></p>
     </SiteSection>
@@ -265,7 +266,7 @@ cargo run -p console       # OpenAI, Anthropic or Gemini, whichever key is set; 
           <p>
             Read the architecture guide, then run the travel desk: four turns, four guarantees, and no key needed. When
             you want to see what a real model does with the contract, the console runs the same desk against
-            whichever provider you have a key for. A mini one is enough.
+            whichever provider you have a key for. A small one is enough.
           </p>
         </div>
         <div class="tf-cta__actions">

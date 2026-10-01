@@ -65,7 +65,7 @@ use turnframe::provider::secret::ApiKey;
 let provider: Arc<dyn ModelProvider> = Arc::new(
     OpenAiProvider::openai()
         .api_key(ApiKey::new(std::env::var("OPENAI_API_KEY")?))
-        .model("gpt-5.4-mini")
+        .model("gpt-6-luna")
         .build()?,
 );
 ```

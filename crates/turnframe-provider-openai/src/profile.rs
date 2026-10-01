@@ -194,17 +194,27 @@ impl RouteShape {
     }
 }
 
-/// Whether an OpenAI model belongs to a reasoning family: `gpt-5*`, `o1`, `o3`, `o4`.
+/// Whether an OpenAI model belongs to a reasoning family: every `gpt` from `gpt-5` on,
+/// and `o1`, `o3`, `o4`.
 ///
 /// Those take a reasoning effort and only their default temperature. A deployment name
 /// that hides the family should declare its capabilities explicitly.
 #[must_use]
 pub fn is_reasoning_model(model: &str) -> bool {
     let name = model.rsplit('/').next().unwrap_or(model);
-    name.starts_with("gpt-5")
+    gpt_generation(name).is_some_and(|generation| generation >= 5)
         || ["o1", "o3", "o4"]
             .iter()
             .any(|family| name.starts_with(family))
+}
+
+/// The generation a `gpt-N…` name belongs to: 6 for `gpt-6.1-sol`.
+pub(crate) fn gpt_generation(name: &str) -> Option<u32> {
+    let rest = name.strip_prefix("gpt-")?;
+    let digits = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
+    rest[..digits].parse().ok()
 }
 
 /// The OpenAI endpoint's default declaration, adjusted to the model family.
@@ -848,6 +858,24 @@ impl EndpointProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_gpt_from_the_fifth_on_reasons() {
+        for model in [
+            "gpt-5",
+            "gpt-5.4-mini",
+            "gpt-6-luna",
+            "gpt-6.1-sol",
+            "gpt-7",
+            "o4-mini",
+        ] {
+            assert!(is_reasoning_model(model), "{model}");
+        }
+        assert!(is_reasoning_model("openai/gpt-6-astra"));
+        for model in ["gpt-4o-mini", "gpt-4.1", "gpt-3.5-turbo", "gpt-oss-120b"] {
+            assert!(!is_reasoning_model(model), "{model}");
+        }
+    }
 
     #[test]
     fn the_three_shapes_differ_where_they_are_meant_to() {

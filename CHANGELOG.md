@@ -5,6 +5,61 @@ All notable changes to Turnframe are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1]
+
+Published: `turnframe-provider-openai`, `turnframe-tasks`, `turnframe-understand`, `turnframe-test`
+and the `turnframe` facade at 0.2.1. Every other crate stays at 0.2.0. The facade asks for the four
+at 0.2.1.
+
+### Fixed
+
+**`turnframe-provider-openai`**
+
+- GPT-6 models run. The adapter knew reasoning models only by the `gpt-5`, `o1`, `o3` and `o4`
+  names, so a `gpt-6` model was sent `max_tokens`, a temperature and a seed, and OpenAI refused
+  every call with `unsupported_parameter`. Every `gpt` from `gpt-5` on is now a reasoning model,
+  `is_reasoning_model` included: it is sent `max_completion_tokens` and its reasoning effort, and
+  never a temperature or a seed.
+- The least effort is one the model takes: `none` on `gpt-6-luna` and `gpt-6-sol`, and `low` on
+  `gpt-6-astra` and `gpt-6.1-sol`, which refuse `none`. Reasoning counts against a task's output
+  cap, so on those two the small tasks keep less room for their answer.
+
+**`turnframe-tasks`**
+
+- The reply, the answer and the progress line are written at the least effort, as every
+  understanding task is read. They sent none, so a model whose default effort reasons spent the
+  reply's cap thinking: on `gpt-6-luna`, 12 replies in 284 came back empty and the turn fell back
+  to the reply code writes. Their temperature is still the model's own. On `gpt-5.x` nothing
+  changes; an `o` model writes at `low`, and a Gemini model declaring reasoning controls no longer
+  thinks before it writes.
+
+**`turnframe-understand`**
+
+- Refusing to give a value («you won't get A from me») is a request, so the refusal is recorded.
+  It was read as a condition to leave A as it is, and nothing was recorded.
+- Saying what one would rather a record hold («I'd rather A») is a request. It could be read as
+  small talk, and nothing was done.
+- The check takes words that place a day without naming it («the end of the month», «next
+  Friday») as stating the day they place, and still finds a day they do not place different. It
+  had called such a date incomplete and asked for it again.
+
+**`turnframe-test`**
+
+- The trip sample adds a new extra with `add_extra`: a payer given for an extra the trip already
+  holds is read as `assign_payer`, without asking for a new extra's price.
+
+### Changed
+
+- `gpt-6-luna` is the model the benchmarks and the site measure, and the default of the OpenAI
+  live smoke test, the evaluation harness and the console example. On it the live corpus passed
+  227 of 228 samples, merged from a whole run and two re-runs of the items this release's rules
+  act on, for $0.37, and ten simulated conversations reached their goal ten times with no dead
+  end. The `gpt-5.4-mini` runs of 0.2.0 stay in the benchmarks.
+- The live smoke test's plain calls ask for the least effort, as every understanding task does: at
+  its default effort a reasoning model can spend a small output cap reasoning and answer nothing.
+- The site reads its version from the facade, the version applications depend on, and says
+  small models where it said mini and flash ones.
+
 ## [0.2.0]
 
 Published: every crate at 0.2.0, on the workspace version again. Every crate depends on

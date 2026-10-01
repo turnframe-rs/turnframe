@@ -3639,7 +3639,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "turnframe"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3850,7 +3850,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-provider-openai"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3939,7 +3939,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-tasks"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "futures",
@@ -3970,7 +3970,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-test"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3995,7 +3995,7 @@ dependencies = [
 
 [[package]]
 name = "turnframe-understand"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "chrono",
