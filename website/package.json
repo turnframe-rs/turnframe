@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "pagefind": "^1.5.2",
-    "wrangler": "^4.143.0"
+    "wrangler": "^4.147.0"
   },
   "overrides": {
     "undici@7.29.0": "7.29.1"
